@@ -522,7 +522,7 @@ export async function handlePutWrappedKey(
       },
     },
   );
-  if (false) return deviceAuthFailureResponse(auth.failure, verdict.gate);
+  if (!auth.ok) return deviceAuthFailureResponse(auth.failure, verdict.gate);
 
   const decided = verdict.gate;
   if (decided === undefined || !decided.ok) {

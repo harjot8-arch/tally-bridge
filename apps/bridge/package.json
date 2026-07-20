@@ -13,7 +13,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
     "test": "node --test --experimental-strip-types test/*.test.ts",
     "visual": "npm run build && electron scripts/visual-harness.mjs",
-    "visual:show": "npm run build && electron scripts/visual-harness.mjs --show"
+    "visual:show": "npm run build && electron scripts/visual-harness.mjs --show",
+    "pretest": "cd ../.. && npm run build -w @tally-bridge/core -w @tally-bridge/crypto -w @tally-bridge/protocol -w @tally-bridge/tally -w @tally-bridge/viewmodel"
   },
   "dependencies": {
     "@scure/bip39": "^2.2.0",

@@ -38,10 +38,31 @@ test('THE FORGERY IS REFUSED: a server-signed envelope never becomes a card', as
   const fx = await makeFixture();
   // The server fabricates a cash balance of one crore and signs it with its OWN key.
   const forged = await slotRow(fx, cashPayload('-10000000.00'), fx.server.privateKey);
-  const result = await ready(fx, fakeServer(fx, { snapshots: [forged] }));
+  /*
+   * The company row is signed HONESTLY, and that is the whole point of its presence.
+   *
+   * An earlier version of this test shipped the forged cash slot ALONE and asserted
+   * `state === 'error'`. That assertion was vacuous: with no company row there is nothing to
+   * assemble, so the result is an error whether the forgery was refused or waved through.
+   * Mutating away the signature check in `packages/crypto/src/envelope.ts` left this test GREEN
+   * — the exact failure mode this repo keeps re-learning, in the one test the E2E claim rests on.
+   *
+   * With an honest company present, assembly SUCCEEDS, so a forgery that slipped through would
+   * have to show up as a card — and the assertions below would fail. The test can now fail.
+   */
+  const company = await slotRow(fx, companyPayload(), fx.device.privateKey);
+  const result = await ready(fx, fakeServer(fx, { snapshots: [forged, company] }));
 
-  // Every slot failed to open, so there is no company to show — an error, not a card.
-  assert.equal(result.state, 'error', JSON.stringify(result));
+  // The company is readable, so we get a dashboard — but one honestly marked as incomplete,
+  // with NO cash card, because the only cash on offer was a forgery.
+  assert.equal(result.state, 'ready', JSON.stringify(result));
+  if (result.state !== 'ready') return;
+  assert.equal(result.incomplete, true, 'a refused slot must be reported, not silently dropped');
+  assert.equal(
+    result.companies[0]?.cashBank,
+    undefined,
+    'THE FORGERY BECAME A CARD — the E2E claim is void',
+  );
   // And the fabricated number appears NOWHERE in the result.
   assert.ok(!JSON.stringify(result).includes('10000000'), 'the forged figure leaked into the result');
   assert.ok(!JSON.stringify(result).includes('1,00,00,000'));

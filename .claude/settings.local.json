@@ -25,5 +25,8 @@
     "superpowers@superpowers-marketplace": true,
     "open-code-review@open-code-review": true,
     "security-guidance@claude-plugins-official": true
-  }
+  },
+  "disabledMcpjsonServers": [
+    "claude-flow"
+  ]
 }

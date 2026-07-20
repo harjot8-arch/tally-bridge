@@ -3,12 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "The web dashboard's data/crypto layer. No UI here \u2014 the owner writes the HTML/CSS/JS and calls the built bundle. `npm run build` emits dist/tally-data.js and dist/tally-worker.js as browser ES modules; the deploy bundle ships them into static/. See README.md.",
+  "description": "The web dashboard's data/crypto layer. No UI here — the owner writes the HTML/CSS/JS and calls the built bundle. `npm run build` emits dist/tally-data.js and dist/tally-worker.js as browser ES modules; the deploy bundle ships them into static/. See README.md.",
   "scripts": {
     "build": "node build.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
     "test": "node --test --experimental-strip-types test/*.test.ts",
-    "visual": "npm run build && electron scripts/visual-harness.mjs"
+    "visual": "npm run build && electron scripts/visual-harness.mjs",
+    "pretest": "cd ../.. && npm run build -w @tally-bridge/core -w @tally-bridge/crypto -w @tally-bridge/protocol -w @tally-bridge/viewmodel"
   },
   "dependencies": {
     "@tally-bridge/core": "*",
