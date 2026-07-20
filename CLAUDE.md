@@ -49,7 +49,19 @@ Two corollaries, both learned the hard way here:
   test, not facts.
 - **Mutate the defence, confirm the test goes red, revert.** Several headline security tests
   stayed green while the guard they were named after was deleted. A test that cannot fail is
-  worse than no test.
+  worse than no test. The forgery test was one of them: it asserted `state === 'error'` while
+  supplying nothing to assemble, so it passed whether or not the forgery was caught. A refusal
+  test must let everything else SUCCEED, or "it failed" proves nothing.
+
+Mutation testing has bitten back twice. Both times the harness lied, not the code:
+- **Revert with `git checkout`, never a `/tmp` copy.** An interrupted run left a mutation applied;
+  the retry's "backup" captured the already-broken file, the revert restored the break, and
+  `git add -A` committed a **disabled Ed25519 auth gate**. Always re-run the full suite after a
+  mutation session — that is the only reason this was caught.
+- **A green suite may not be running your edit.** Every package exports `./dist`, so an app's
+  tests load a COMPILED copy. Mutating `packages/*/src` and testing an app proves nothing unless
+  the dep is rebuilt; each app now has a `pretest` that does it. A mutation that changes nothing
+  reads exactly like a defence that is redundant — check which one you have.
 
 ## Layout (npm workspaces — not `/src`, `/tests`, `/docs`)
 
