@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tally | Highly Optimized Architecture</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <style>
+        :root {
+            var(--bg-grid): #e0e0e0;
+            --bg-grid: #e0e0e0;
+            --bg-panel: #ffffff;
+            --bg-hover: #fafafa;
+            --text-main: #000000;
+            --text-muted: #666666;
+            --text-light: #999999;
+            --font-stack: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            --pad: clamp(1.5rem, 3vw, 3rem);
+        }
+
+        * {
+            margin: 0; padding: 0; box-sizing: border-box; cursor: none;
+        }
+
+        body {
+            background-color: var(--bg-grid); color: var(--text-main);
+            font-family: var(--font-stack);
+            -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+            overflow-x: hidden;
+            overscroll-behavior: none; /* Prevents elastic bounce lag on Mac/Mobile */
+        }
+
+        @media (pointer: coarse) {
+            * { cursor: auto !important; }
+            #cursor, #cursor-follower { display: none !important; }
+            .panel:hover { background: var(--bg-panel); }
+        }
+
+        /* GPU Accelerated Cursor */
+        #cursor, #cursor-follower {
+            position: fixed; top: 0; left: 0; border-radius: 50%;
+            pointer-events: none; z-index: 9999;
+            transform: translate3d(-50%, -50%, 0);
+            will-change: transform;
+        }
+        #cursor { width: 4px; height: 4px; background: var(--text-main); }
+        #cursor-follower {
+            width: 40px; height: 40px; border: 1px solid rgba(0,0,0,0.15);
+            transition: width 0.3s ease-out, height 0.3s ease-out, background 0.3s ease-out;
+        }
+        #cursor-follower.active {
+            width: 70px; height: 70px; background: rgba(0,0,0,0.04); border-color: transparent;
+        }
+
+        /* Fluid Typography */
+        .micro-heading { font-size: clamp(0.55rem, 1vw, 0.6rem); text-transform: uppercase; letter-spacing: 0.15em; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+        .micro-heading.dark { color: var(--text-main); }
+        .micro-heading.wrap { white-space: normal; line-height: 1.4; }
+
+        .val-hero { font-size: clamp(3rem, 7vw, 7rem); font-weight: 300; letter-spacing: -0.05em; line-height: 0.9; }
+        .val-primary { font-size: clamp(2rem, 4vw, 4rem); font-weight: 300; letter-spacing: -0.04em; line-height: 0.9; }
+        .val-secondary { font-size: clamp(1rem, 2vw, 1.1rem); font-weight: 400; letter-spacing: -0.02em; }
+        .val-micro { font-size: clamp(0.8rem, 1.5vw, 0.85rem); font-weight: 500; letter-spacing: -0.01em; }
+
+        /* Auth Curtain - GPU Accelerated */
+        #auth-curtain {
+            position: fixed; inset: 0; background: var(--bg-panel); z-index: 100;
+            display: flex; align-items: center; justify-content: center; padding: var(--pad);
+            will-change: transform; transform: translateZ(0);
+        }
+        .auth-container { width: 100%; max-width: 420px; }
+        .auth-title { font-size: clamp(2rem, 5vw, 4rem); font-weight: 400; letter-spacing: -0.04em; margin-bottom: clamp(2rem, 5vw, 3rem); line-height: 1; }
+
+        .input-group { position: relative; margin-bottom: 2.5rem; }
+        .input-group input { width: 100%; background: transparent; border: none; border-bottom: 1px solid var(--text-light); padding: 1rem 0 0.5rem; font-size: 1.25rem; outline: none; transition: border-color 0.3s; border-radius: 0; }
+        .input-group input:focus { border-bottom-color: var(--text-main); }
+        .input-group label { position: absolute; left: 0; top: 1rem; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; pointer-events: none; transition: 0.3s ease-out; }
+        .input-group input:focus ~ label, .input-group input:valid ~ label { top: -1rem; font-size: 0.65rem; color: var(--text-main); font-weight: 600; }
+
+        .btn-submit { background: var(--text-main); color: var(--bg-panel); border: none; width: 100%; padding: 1.25rem; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.2em; margin-top: 1rem; transition: transform 0.2s; will-change: transform; }
+        @media (hover: hover) { .btn-submit:hover { transform: translateY(-2px); } }
+
+        /* Dashboard Core */
+        #dashboard-wrapper { opacity: 0; visibility: hidden; min-height: 100vh; display: flex; flex-direction: column; gap: 1px; }
+
+        header { background: var(--bg-panel); padding: 1.5rem var(--pad); display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+        .timeline { display: flex; gap: clamp(1rem, 2vw, 2.5rem); overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
+        .timeline::-webkit-scrollbar { display: none; }
+
+        .year-btn { font-size: clamp(1rem, 2vw, 1.1rem); color: var(--text-light); transition: color 0.3s; position: relative; padding: 0.5rem; display: inline-block; font-weight: 500; white-space: nowrap; }
+        .year-btn.active { color: var(--text-main); }
+        .year-btn::after { content: ''; position: absolute; bottom: 0px; left: 0; width: 100%; height: 1px; background: var(--text-main); transform: scaleX(0); transform-origin: right; transition: transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1); will-change: transform; }
+        .year-btn.active::after { transform: scaleX(1); transform-origin: left; }
+
+        /* Geometric Grid */
+        .bento-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 1px; background: var(--bg-grid); flex-grow: 1; }
+
+        /* Panels optimized for composite layers */
+        .panel {
+            background: var(--bg-panel); padding: var(--pad); display: flex; flex-direction: column; justify-content: space-between; position: relative;
+            transition: background 0.3s;
+            will-change: transform, opacity; transform: translateZ(0);
+        }
+        @media (hover: hover) { .panel:hover { background: var(--bg-hover); } }
+
+        /* Spans */
+        .p-sales    { grid-column: span 8; grid-row: span 2; }
+        .p-purchase { grid-column: span 4; }
+        .p-expense  { grid-column: span 4; }
+        .p-bank     { grid-column: span 8; }
+        .p-cash     { grid-column: span 4; }
+        .p-tax      { grid-column: span 4; }
+        .p-stock    { grid-column: span 4; }
+        .p-loan     { grid-column: span 4; }
+
+        @media (max-width: 1024px) {
+            .p-sales    { grid-column: span 12; grid-row: span 1; }
+            .p-bank     { grid-column: span 12; }
+            .p-purchase, .p-expense, .p-tax, .p-stock, .p-cash, .p-loan { grid-column: span 6; }
+        }
+
+        @media (max-width: 640px) {
+            header { flex-direction: column; align-items: flex-start; }
+            .timeline { width: 100%; padding-bottom: 0.5rem; }
+            .bento-grid > div { grid-column: span 12 !important; grid-row: span 1 !important; }
+            .flex-between.mobile-stack { flex-direction: column; align-items: flex-start !important; gap: 1rem; }
+            .mobile-stack > div { text-align: left !important; }
+        }
+
+        /* Layout Grids */
+        .panel-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: clamp(1.5rem, 3vw, 2rem); }
+        .flex-between { display: flex; justify-content: space-between; align-items: center; }
+        .sub-metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(1rem, 2vw, 2rem); margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--bg-grid); }
+        .quarter-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--bg-grid); }
+        .bank-grid { grid-template-columns: repeat(3, 1fr); }
+
+        @media (max-width: 640px) {
+            .quarter-grid { grid-template-columns: repeat(2, 1fr); }
+            .bank-grid { grid-template-columns: 1fr; gap: 1.5rem; }
+        }
+
+        .ledger-list { margin-top: clamp(1rem, 2vw, 2rem); display: flex; flex-direction: column; gap: 0.75rem; }
+        .ledger-row { display: flex; justify-content: space-between; border-bottom: 1px solid #f0f0f0; padding-bottom: 0.5rem; }
+        .ledger-row:last-child { border-bottom: none; }
+
+        /* Hardware Accelerated Data Bars */
+        .segmented-bar { width: 100%; height: 4px; display: flex; gap: 2px; margin-top: 0.5rem; }
+        .segment { height: 100%; background: var(--text-main); will-change: width; }
+        .seg-1 { opacity: 1; } .seg-2 { opacity: 0.6; } .seg-3 { opacity: 0.3; } .seg-4 { opacity: 0.1; }
+
+        .viz-line { width: 100%; height: 2px; background: var(--bg-grid); position: relative; margin-top: 0.6rem; overflow: hidden; }
+        /* Using scaleX instead of width for zero-layout-thrashing animation */
+        .viz-fill { position: absolute; top: 0; left: 0; height: 100%; width: 100%; background: var(--text-main); transform: scaleX(0); transform-origin: left; will-change: transform; }
+        .viz-fill.secondary { background: var(--text-light); }
+
+        /* SVG Chart - GPU forced */
+        .svg-chart { width: 100%; height: clamp(80px, 15vw, 120px); margin-top: 1.5rem; overflow: visible; transform: translateZ(0); }
+        .chart-path { fill: none; stroke: var(--text-main); stroke-width: 2px; stroke-linecap: square; stroke-linejoin: bevel; will-change: d; }
+        .chart-area { fill: url(#gradient); opacity: 0.12; will-change: d; }
+    </style>
+</head>
+<body>
+
+    <div id="cursor"></div>
+    <div id="cursor-follower"></div>
+
+    <div id="auth-curtain">
+        <div class="auth-container">
+            <div class="micro-heading wrap" style="margin-bottom: 1.5rem;">Root Access Protocol</div>
+            <h1 class="auth-title">Financial<br>Architecture</h1>
+            <form onsubmit="unlockDashboard(event)">
+                <div class="input-group">
+                    <input type="text" required class="hover-trigger">
+                    <label>Admin ID</label>
+                </div>
+                <div class="input-group">
+                    <input type="password" required class="hover-trigger">
+                    <label>Tally Passcode</label>
+                </div>
+                <button type="submit" class="btn-submit hover-trigger">Initialize Synchronization</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="dashboard-wrapper">
+        <header>
+            <div>
+                <div class="micro-heading dark">Tally Executive Sync</div>
+                <div class="micro-heading" style="margin-top: 0.4rem;" id="sys-clock">00:00:00</div>
+            </div>
+            <div class="timeline" id="timeline-container"></div>
+            <div class="micro-heading hover-trigger" style="border-bottom: 1px solid var(--text-main);" onclick="location.reload()">
+                Terminate Connection
+            </div>
+        </header>
+
+        <main class="bento-grid">
+
+            <div class="panel p-sales anim-panel">
+                <div class="panel-header">
+                    <span class="micro-heading dark">Total Sales Ledger</span>
+                    <span class="micro-heading trend-val" data-key="salesTrend">--</span>
+                </div>
+                <div class="flex-between mobile-stack" style="align-items: flex-end;">
+                    <div class="val-hero ds-val" data-key="sales">0</div>
+                    <div style="text-align: right; padding-bottom: 0.5rem;">
+                        <div class="micro-heading">YoY Variance</div>
+                        <div class="val-secondary ds-val" data-key="salesVar">+0</div>
+                    </div>
+                </div>
+
+                <svg class="svg-chart" preserveAspectRatio="none" viewBox="0 0 1000 100">
+                    <defs>
+                        <linearGradient id="gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stop-color="#000000" /><stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+                        </linearGradient>
+                    </defs>
+                    <path class="chart-area" d=""></path>
+                    <path class="chart-path" d=""></path>
+                </svg>
+
+                <div class="quarter-grid">
+                    <div><div class="micro-heading">Q1 Revenue</div><div class="val-micro ds-val" data-key="q1">0</div></div>
+                    <div><div class="micro-heading">Q2 Revenue</div><div class="val-micro ds-val" data-key="q2">0</div></div>
+                    <div><div class="micro-heading">Q3 Revenue</div><div class="val-micro ds-val" data-key="q3">0</div></div>
+                    <div><div class="micro-heading">Q4 Revenue</div><div class="val-micro ds-val" data-key="q4">0</div></div>
+                </div>
+            </div>
+
+            <div class="panel p-purchase anim-panel">
+                <div class="panel-header"><span class="micro-heading dark">Total Purchase</span></div>
+                <div class="val-primary ds-val" data-key="purchase">0</div>
+
+                <div class="ledger-list" style="flex-grow: 1;">
+                    <div class="ledger-row"><span class="micro-heading">Dom. Vendors</span><span class="val-micro ds-val" data-key="purDom">0</span></div>
+                    <div class="ledger-row"><span class="micro-heading">Intl. Imports</span><span class="val-micro ds-val" data-key="purInt">0</span></div>
+                </div>
+
+                <div style="margin-top: auto; padding-top: 1.5rem;">
+                    <div class="flex-between">
+                        <span class="micro-heading">Vendor Concentration</span>
+                        <span class="micro-heading">Top 3 vs Rest</span>
+                    </div>
+                    <div class="segmented-bar">
+                        <div class="segment seg-1 ds-w" data-key="v1"></div>
+                        <div class="segment seg-2 ds-w" data-key="v2"></div>
+                        <div class="segment seg-3 ds-w" data-key="v3"></div>
+                        <div class="segment seg-4 ds-w" data-key="v4"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel p-expense anim-panel">
+                <div class="panel-header"><span class="micro-heading dark">Total Expense</span></div>
+                <div class="val-primary ds-val" data-key="expense">0</div>
+
+                <div class="ledger-list" style="flex-grow: 1;">
+                    <div class="ledger-row"><span class="micro-heading">Payroll &amp; HR</span><span class="val-micro ds-val" data-key="expPayroll">0</span></div>
+                    <div class="ledger-row"><span class="micro-heading">Marketing</span><span class="val-micro ds-val" data-key="expMkt">0</span></div>
+                    <div class="ledger-row"><span class="micro-heading">Operations</span><span class="val-micro ds-val" data-key="expOps">0</span></div>
+                </div>
+
+                <div style="margin-top: 1.5rem;">
+                    <div class="flex-between">
+                        <span class="micro-heading">OpEx Cap Variance</span>
+                        <span class="val-micro ds-val" data-key="expVar" data-suffix="%">0</span>
+                    </div>
+                    <div class="viz-line"><div class="viz-fill ds-s" data-key="expVarPct"></div></div>
+                </div>
+            </div>
+
+            <div class="panel p-bank anim-panel">
+                <div class="panel-header"><span class="micro-heading dark">Consolidated Bank Balance</span></div>
+                <div class="flex-between mobile-stack" style="align-items: flex-end;">
+                    <div class="val-hero ds-val" style="font-size: clamp(3rem, 6vw, 5.5rem);" data-key="bank">0</div>
+                    <div style="text-align: right; padding-bottom: 0.5rem;">
+                        <div class="micro-heading">Net Liquidity Ratio</div>
+                        <div class="val-secondary ds-val" data-key="liquidity" data-raw="true">0</div>
+                    </div>
+                </div>
+
+                <div class="sub-metrics-grid bank-grid">
+                    <div>
+                        <div class="micro-heading">Operating Acct</div>
+                        <div class="val-micro ds-val" style="margin-top: 0.5rem;" data-key="bankOp">0</div>
+                        <div class="viz-line"><div class="viz-fill seg-1 ds-s" data-key="bOpPct"></div></div>
+                    </div>
+                    <div>
+                        <div class="micro-heading">Payroll Acct</div>
+                        <div class="val-micro ds-val" style="margin-top: 0.5rem;" data-key="bankPay">0</div>
+                        <div class="viz-line"><div class="viz-fill seg-2 ds-s" data-key="bPayPct"></div></div>
+                    </div>
+                    <div>
+                        <div class="micro-heading">Reserve Acct</div>
+                        <div class="val-micro ds-val" style="margin-top: 0.5rem;" data-key="bankRes">0</div>
+                        <div class="viz-line"><div class="viz-fill seg-3 ds-s" data-key="bResPct"></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel p-cash anim-panel">
+                <div class="panel-header"><span class="micro-heading dark">Cash-in-Hand</span></div>
+                <div class="val-primary ds-val" data-key="cash">0</div>
+
+                <div class="ledger-list" style="flex-grow: 1;">
+                    <div class="ledger-row"><span class="micro-heading">Daily Avg Burn</span><span class="val-micro ds-val" data-key="cashBurn">0</span></div>
+                    <div class="ledger-row"><span class="micro-heading">Replenish Limit</span><span class="val-micro ds-val" data-key="cashLimit">0</span></div>
+                </div>
+
+                <div style="margin-top: 1.5rem;">
+                    <div class="flex-between">
+                        <span class="micro-heading">Vault Capacity</span>
+                        <span class="val-micro ds-val" data-key="cashCapPct" data-suffix="%">0</span>
+                    </div>
+                    <div class="viz-line"><div class="viz-fill ds-s" data-key="cashCapPct"></div></div>
+                </div>
+            </div>
+
+            <div class="panel p-tax anim-panel">
+                <div class="panel-header"><span class="micro-heading dark">Duty and Tax Ledger</span></div>
+                <div class="val-primary ds-val" data-key="tax">0</div>
+
+                <div class="ledger-list" style="flex-grow: 1;">
+                    <div class="ledger-row"><span class="micro-heading">CGST Payable</span><span class="val-micro ds-val" data-key="taxCgst">0</span></div>
+                    <div class="ledger-row"><span class="micro-heading">SGST Payable</span><span class="val-micro ds-val" data-key="taxSgst">0</span></div>
+                    <div class="ledger-row"><span class="micro-heading">IGST Payable</span><span class="val-micro ds-val" data-key="taxIgst">0</span></div>
+                </div>
+
+                <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--bg-grid);">
+                    <div class="flex-between">
+                        <span class="micro-heading dark wrap">Input Tax Credit (ITC)</span>
+                        <span class="val-micro ds-val" data-key="taxItc">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel p-stock anim-panel">
+                <div class="panel-header"><span class="micro-heading dark">Closing Stock Val</span></div>
+                <div class="val-primary ds-val" data-key="stock">0</div>
+
+                <div style="margin-top: clamp(1rem, 2vw, 2rem);">
+                    <div class="flex-between" style="margin-bottom: 0.5rem;">
+                        <span class="micro-heading">Aging Analysis</span>
+                        <span class="micro-heading">&lt;30d | 30-90 | &gt;90</span>
+                    </div>
+                    <div class="segmented-bar">
+                        <div class="segment seg-1 ds-w" data-key="stkFast"></div>
+                        <div class="segment seg-2 ds-w" data-key="stkMed"></div>
+                        <div class="segment seg-4 ds-w" data-key="stkSlow"></div>
+                    </div>
+                </div>
+
+                <div class="sub-metrics-grid" style="margin-top: auto;">
+                    <div>
+                        <div class="micro-heading">Active SKUs</div>
+                        <div class="val-secondary ds-val" data-key="skuCount" data-raw="true">0</div>
+                    </div>
+                    <div>
+                        <div class="micro-heading">Turnover</div>
+                        <div class="val-secondary ds-val" data-key="turnover" data-suffix="x" data-raw="true">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel p-loan anim-panel">
+                <div class="panel-header"><span class="micro-heading dark">Loan Balance</span></div>
+                <div class="val-primary ds-val" data-key="loan">0</div>
+
+                <div class="ledger-list" style="flex-grow: 1;">
+                    <div class="ledger-row"><span class="micro-heading">Principal Paid</span><span class="val-micro ds-val" data-key="loanPrin">0</span></div>
+                    <div class="ledger-row"><span class="micro-heading">Interest Accrued</span><span class="val-micro ds-val" data-key="loanInt">0</span></div>
+                </div>
+
+                <div style="margin-top: 1.5rem;">
+                    <div class="flex-between">
+                        <span class="micro-heading">Amortization</span>
+                        <span class="val-micro ds-val" data-key="loanProg" data-suffix="%">0</span>
+                    </div>
+                    <div class="viz-line"><div class="viz-fill ds-s" data-key="loanProg"></div></div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        // --- High-Performance Formatters (Instantiated ONCE, completely eliminating CPU load in loops) ---
+        const inrFmt = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
+        const numFmt = new Intl.NumberFormat('en-IN');
+        const formatInrSigned = (n) => (n > 0 ? '+' : '') + inrFmt.format(n);
+
+        // --- Hardware Accelerated Cursor ---
+        const cursor = document.getElementById('cursor');
+        const follower = document.getElementById('cursor-follower');
+        let cx = 0, cy = 0, fx = 0, fy = 0;
+
+        if(window.matchMedia("(pointer: fine)").matches) {
+            document.addEventListener('mousemove', (e) => {
+                cx = e.clientX; cy = e.clientY;
+                gsap.set(cursor, { x: cx, y: cy }); // GSAP handles transform3d internally
+            }, { passive: true }); // passive flag for scrolling performance
+
+            gsap.ticker.add(() => {
+                fx += (cx - fx) * 0.15; fy += (cy - fy) * 0.15;
+                gsap.set(follower, { x: fx, y: fy });
+            });
+        }
+
+        const bindHover = () => {
+            if(window.matchMedia("(pointer: fine)").matches) {
+                document.querySelectorAll('.hover-trigger, input, button').forEach(el => {
+                    el.addEventListener('mouseenter', () => follower.classList.add('active'));
+                    el.addEventListener('mouseleave', () => follower.classList.remove('active'));
+                });
+            }
+        };
+
+        // --- Live Clock ---
+        setInterval(() => {
+            document.getElementById('sys-clock').textContent = new Date().toLocaleTimeString('en-US', {hour12: false});
+        }, 1000);
+
+        // --- Data Simulation ---
+        const ds = {};
+        let prevSales = 28000000;
+
+        for(let y = 2022; y <= 2026; y++) {
+            const m = 1 + ((y - 2022) * 0.18);
+            const sales = Math.floor(32450000 * m);
+            const pts = [];
+            for(let i=0; i<12; i++) pts.push(Math.random() * 70 + 20);
+
+            const tax = Math.floor(3850000 * m);
+            const bank = Math.floor(12500000 * m);
+            const exp = Math.floor(4500000 * m);
+
+            const v1 = 45 + Math.random()*10, v2 = 25 + Math.random()*5, v3 = 15 + Math.random()*5;
+
+            ds[y] = {
+                sales: sales, salesTrend: y === 2022 ? 'BASE YR' : `+${(((sales - prevSales)/prevSales)*100).toFixed(1)}% YoY`, salesVar: y === 2022 ? 0 : sales - prevSales,
+                chartData: pts, q1: sales * 0.22, q2: sales * 0.26, q3: sales * 0.24, q4: sales * 0.28,
+                purchase: Math.floor(15400000 * m), purDom: Math.floor(15400000 * m * 0.7), purInt: Math.floor(15400000 * m * 0.3),
+                v1: v1, v2: v2, v3: v3, v4: 100 - (v1+v2+v3),
+                expense: exp, expPayroll: exp * 0.55, expMkt: exp * 0.25, expOps: exp * 0.20, expVar: (Math.random() * 5 + 2).toFixed(1), expVarPct: 65 + Math.random() * 20,
+                bank: bank, bankOp: bank * 0.6, bankPay: bank * 0.25, bankRes: bank * 0.15, bOpPct: 60, bPayPct: 25, bResPct: 15, liquidity: (1.8 + Math.random() * 0.5).toFixed(2),
+                cash: Math.floor(450000 * m), cashBurn: Math.floor(12500 * m), cashLimit: 600000, cashCapPct: Math.floor((450000 * m) / 600000 * 100),
+                tax: tax, taxCgst: tax * 0.35, taxSgst: tax * 0.35, taxIgst: tax * 0.30, taxItc: tax * 0.45,
+                stock: Math.floor(9500000 * m), skuCount: Math.floor(450 + (m*50)), turnover: (4 + Math.random() * 2).toFixed(1), stkFast: 55, stkMed: 30, stkSlow: 15,
+                loan: Math.floor(6400000 * (1 - ((y-2022) * 0.15))), loanPrin: Math.floor(2500000 * m), loanInt: Math.floor(450000 * m), loanProg: 20 + ((y-2022) * 15)
+            };
+            prevSales = sales;
+        }
+
+        let currYear = 2026;
+
+        // --- Engine Render Logic ---
+        const buildTimeline = () => {
+            const c = document.getElementById('timeline-container');
+            Object.keys(ds).sort((a,b)=>b-a).forEach(y => {
+                const b = document.createElement('div');
+                b.className = `year-btn hover-trigger ${y == currYear ? 'active' : ''}`;
+                b.textContent = y;
+
+                if(window.matchMedia("(pointer: fine)").matches) {
+                    b.addEventListener('mousemove', (e) => {
+                        const rect = b.getBoundingClientRect();
+                        gsap.to(b, { x: (e.clientX - rect.left - rect.width/2) * 0.2, y: (e.clientY - rect.top - rect.height/2) * 0.2, duration: 0.3, ease: "power2.out" });
+                    }, { passive: true });
+                    b.addEventListener('mouseleave', () => gsap.to(b, { x: 0, y: 0, duration: 0.7, ease: "elastic.out(1, 0.3)" }));
+                }
+
+                b.onclick = () => {
+                    if(y == currYear) return;
+                    currYear = y;
+                    document.querySelectorAll('.year-btn').forEach(el => el.classList.remove('active'));
+                    b.classList.add('active');
+                    updateData(y, false);
+                };
+                c.appendChild(b);
+            });
+            bindHover();
+        };
+
+        const drawSvg = (pts, isInit) => {
+            const step = 1000 / (pts.length - 1);
+            let d = `M 0 ${100 - pts[0]}`;
+            for (let i = 1; i < pts.length; i++) {
+                const x0 = (i - 1) * step, y0 = 100 - pts[i - 1], x1 = i * step, y1 = 100 - pts[i];
+                d += ` C ${x0 + step/2} ${y0}, ${x0 + step/2} ${y1}, ${x1} ${y1}`;
+            }
+            const path = document.querySelector('.chart-path'), area = document.querySelector('.chart-area');
+
+            if(isInit) {
+                path.setAttribute('d', d); area.setAttribute('d', `${d} L 1000 100 L 0 100 Z`);
+                const len = path.getTotalLength();
+                gsap.fromTo(path, {strokeDasharray: len, strokeDashoffset: len}, {strokeDashoffset: 0, duration: 1.5, ease: "power3.inOut", delay: 0.5});
+                gsap.fromTo(area, {opacity: 0}, {opacity: 0.12, duration: 1, delay: 1});
+            } else {
+                gsap.to(path, { attr: { d: d }, duration: 0.8, ease: "power2.inOut" });
+                gsap.to(area, { attr: { d: `${d} L 1000 100 L 0 100 Z` }, duration: 0.8, ease: "power2.inOut" });
+            }
+        };
+
+        const updateData = (year, isInit) => {
+            const d = ds[year];
+            document.querySelector('.trend-val').textContent = d.salesTrend; // Using textContent for zero-layout update
+
+            // Fast DOM updating
+            document.querySelectorAll('.ds-val').forEach((el, i) => {
+                const key = el.getAttribute('data-key'), isRaw = el.getAttribute('data-raw') === 'true', suffix = el.getAttribute('data-suffix') || '';
+                const target = d[key], counter = { val: 0 };
+
+                if(!isInit) gsap.fromTo(el, {y: 10, opacity: 0}, {y: 0, opacity: 1, duration: 0.4});
+
+                gsap.to(counter, {
+                    val: target, duration: 1.5, ease: "power3.out", delay: isInit ? (i * 0.015) : 0,
+                    onUpdate: () => {
+                        let v = counter.val;
+                        if(!isRaw && target % 1 === 0) v = Math.floor(v);
+                        else if (isRaw && target % 1 !== 0) v = v.toFixed(2);
+                        else v = Math.floor(v);
+
+                        // Fast string injection, avoids innerText reflow trigger
+                        el.textContent = (key === 'salesVar' ? formatInrSigned(v) : (isRaw ? numFmt.format(v) : inrFmt.format(v))) + suffix;
+                    }
+                });
+            });
+
+            // Width transitions (for flex layouts)
+            document.querySelectorAll('.ds-w').forEach((el, i) => {
+                gsap.to(el, { width: `${d[el.getAttribute('data-key')]}%`, duration: 1.2, ease: "power3.out", delay: isInit ? (0.6 + i*0.02) : 0 });
+            });
+
+            // ScaleX transitions (Zero-layout composite layer scaling for extreme smoothness)
+            document.querySelectorAll('.ds-s').forEach((el, i) => {
+                gsap.to(el, { scaleX: d[el.getAttribute('data-key')] / 100, duration: 1.2, ease: "power3.out", delay: isInit ? (0.6 + i*0.02) : 0 });
+            });
+
+            drawSvg(d.chartData, isInit);
+        };
+
+        // --- 5. Auth Reveal Logic ---
+        const unlockDashboard = (e) => {
+            e.preventDefault();
+            gsap.to('.btn-submit', { scale: 0.96, duration: 0.1, yoyo: true, repeat: 1 });
+
+            const tl = gsap.timeline({ delay: 0.2 });
+            tl.to("#auth-curtain", { yPercent: -100, duration: 1.2, ease: "power4.inOut" })
+              .set("#dashboard-wrapper", { visibility: "visible" }, "-=1.2")
+              .to("#dashboard-wrapper", { opacity: 1, duration: 0.5 }, "-=0.6")
+              .from(".anim-panel", { y: 40, opacity: 0, duration: 1, stagger: 0.04, ease: "power4.out" }, "-=0.8")
+              .call(() => {
+                  buildTimeline();
+                  updateData(currYear, true);
+              });
+        };
+
+        bindHover();
+    </script>
+</body>
+</html>

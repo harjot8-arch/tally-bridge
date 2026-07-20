@@ -17,7 +17,9 @@ your UI and it.
 ## The whole flow, in one screen
 
 ```js
-import { unlock, loadDashboard, lockSession, localStorageKV, UnlockError } from '@tally-bridge/web';
+// Served at your site root by the deploy bundle. A bare specifier like '@tally-bridge/web'
+// does NOT resolve in a browser without a bundler or import map — use the real path:
+import { unlock, loadDashboard, lockSession, localStorageKV, UnlockError } from '/tally-data.js';
 
 const deps = { fetch: window.fetch.bind(window), storage: localStorageKV(window.localStorage) };
 
@@ -155,8 +157,8 @@ The simplest correct setup: run `src/worker-entry.ts` as a Web Worker and pass i
 `unlock`:
 
 ```js
-import { workerUnlockSeams } from '@tally-bridge/web';
-const worker = new Worker(new URL('./worker-entry.js', import.meta.url), { type: 'module' });
+import { workerUnlockSeams } from '/tally-data.js';
+const worker = new Worker('/tally-worker.js', { type: 'module' });
 const seams = workerUnlockSeams(worker);
 await unlock({ ...deps, ...seams, onStage }, tenantId, passphrase);
 ```
@@ -184,7 +186,10 @@ promise can leak.
 - **Consider showing the device list on `session.firstUse`.** The first unlock on a new browser
   has no memory to catch a rolled-back device list, so a human glance is the backstop.
 - **Serve the whole app over HTTPS with a strict Content-Security-Policy, no inline scripts, no
-  third-party origins.** The deployment already does this; keep it.
+  third-party origins.** NOTE, corrected: the Vercel deployment does **not** set these headers
+  today — `config.json` carries no `headers` block, and the only CSP in this repo is the Electron
+  window's. Treat this as a requirement you must not violate (no CDN scripts, no remote fonts),
+  not as a guarantee already enforced for you. Adding the headers to the deployment is tracked.
 
 **MUST NOT**
 
