@@ -27,6 +27,25 @@ export const DEFAULT_TALLY_PORT = 9000;
 export const MAX_RESPONSE_BYTES = 32 * 1024 * 1024;
 
 /**
+ * Errors that mean "Tally dropped this connection", not "Tally is unreachable".
+ *
+ * FIELD-OBSERVED against a real TallyPrime: it answered the encoding probe and then reset the
+ * very next connection — two back-to-back requests with no gap between them. Tally's listener
+ * is embedded in a single-threaded desktop app; when it is not ready it drops the connection
+ * rather than queueing it. The fake Tally never did this, so nothing here predicted it.
+ *
+ * Retrying is safe because every request this transport makes is a READ — the TDL catalog
+ * contains no mutation. A duplicated request costs one round trip and nothing else.
+ *
+ * ONE retry, not a loop: a reset that survives a pause is a real problem, and hammering a
+ * desktop app the owner is typing into is exactly what this transport exists to avoid.
+ */
+const TRANSIENT_CODES = new Set(['ECONNRESET', 'ECONNABORTED', 'EPIPE']);
+
+/** Long enough for Tally to finish whatever it was doing, short enough to feel instant. */
+export const RETRY_PAUSE_MS = 300;
+
+/**
  * Timeouts.
  *
  * Connect is 2s because this is localhost — Tally is either listening or it isn't; there is no
@@ -152,7 +171,24 @@ export class TallyTransport {
   }
 
   async request(xml: string, timeoutMs: number = TIMEOUTS.sectionMs): Promise<TallyResult> {
-    return this.enqueue(() => this.rawRequest(xml, this.encoding ?? 'utf16le', timeoutMs));
+    return this.enqueue(() => this.attempt(xml, this.encoding ?? 'utf16le', timeoutMs));
+  }
+
+  /**
+   * One request, plus one retry if Tally dropped the connection.
+   *
+   * Runs INSIDE the mutex slot, so the retry cannot interleave with another request — the
+   * one-request-at-a-time rule holds across the pause.
+   */
+  private async attempt(
+    xml: string,
+    encoding: TallyEncoding,
+    timeoutMs: number,
+  ): Promise<TallyResult> {
+    const first = await this.rawRequest(xml, encoding, timeoutMs);
+    if (!first.transient) return first;
+    await new Promise((r) => setTimeout(r, RETRY_PAUSE_MS));
+    return this.rawRequest(xml, encoding, timeoutMs);
   }
 
   /**
@@ -165,9 +201,7 @@ export class TallyTransport {
     if (this.encoding) return this.encoding;
 
     for (const candidate of ['utf16le', 'utf8'] as const) {
-      const res = await this.enqueue(() =>
-        this.rawRequest(probeXml, candidate, TIMEOUTS.probeMs),
-      );
+      const res = await this.enqueue(() => this.attempt(probeXml, candidate, TIMEOUTS.probeMs));
       if (res.ok) {
         this.encoding = candidate;
         return candidate;
@@ -181,15 +215,20 @@ export class TallyTransport {
     return undefined;
   }
 
+  /**
+   * `transient` is internal: it says "this failure is worth one retry", never leaves the
+   * transport, and is deliberately absent from the public `TallyResult` so no caller can
+   * grow a second retry policy on top of this one.
+   */
   private rawRequest(
     xml: string,
     encoding: TallyEncoding,
     timeoutMs: number,
-  ): Promise<TallyResult> {
+  ): Promise<TallyResult & { transient?: boolean }> {
     return new Promise((resolve) => {
       const body = encodeTallyRequest(xml, encoding);
       let settled = false;
-      const done = (r: TallyResult) => {
+      const done = (r: TallyResult & { transient?: boolean }) => {
         if (settled) return;
         settled = true;
         clearTimeout(overall);
@@ -304,7 +343,11 @@ export class TallyTransport {
         }
         // A destroy() we initiated races with this handler; the timeout result already won.
         if (settled) return;
-        done({ ok: false, failure: { kind: 'network', message: e.message } });
+        done({
+          ok: false,
+          failure: { kind: 'network', message: e.message },
+          transient: TRANSIENT_CODES.has(e.code ?? ''),
+        });
       });
 
       req.end(body);

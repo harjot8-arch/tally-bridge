@@ -310,3 +310,76 @@ test('the size cap does not fire on a normal chunked response', async () => {
     },
   );
 });
+
+test('THE FIELD BUG: Tally resetting a connection is retried, not reported as unreachable', async () => {
+  // Observed against a real TallyPrime: it answered the encoding probe, then reset the very
+  // next connection. Two back-to-back reads, no gap. The fake Tally never did this, which is
+  // exactly why a real one had to.
+  let connections = 0;
+  await withFakeTally(
+    (_req, res) => {
+      connections += 1;
+      if (connections === 1) {
+        res.socket?.destroy();
+        return;
+      }
+      res.writeHead(200);
+      res.end(Buffer.from('<ENVELOPE><F01>Acme</F01></ENVELOPE>', 'utf16le'));
+    },
+    async (port) => {
+      const t = new TallyTransport({ port, encoding: 'utf16le' });
+      const res = await t.request(probeRequest());
+      assert.ok(res.ok, 'a single reset must not read as "could not reach Tally"');
+      assert.match(res.xml, /Acme/);
+      assert.equal(connections, 2, 'exactly one retry');
+    },
+  );
+});
+
+test('the retry is ONE retry — a Tally that resets every time still fails', async () => {
+  // Hammering a single-threaded desktop app the owner is typing into is the failure mode this
+  // transport exists to avoid. A reset that survives the pause is a real problem.
+  let connections = 0;
+  await withFakeTally(
+    (_req, res) => {
+      connections += 1;
+      res.socket?.destroy();
+    },
+    async (port) => {
+      const t = new TallyTransport({ port, encoding: 'utf16le' });
+      const res = await t.request(probeRequest());
+      assert.ok(!res.ok);
+      assert.equal(res.failure.kind, 'network');
+      assert.equal(connections, 2, 'one attempt plus one retry, never a loop');
+    },
+  );
+});
+
+test('the retry holds the mutex — a reset never lets two requests interleave', async () => {
+  // The retry runs inside the single slot. If it did not, the pause would be an opening for
+  // the next request, and Tally would see the concurrency this transport promises it never will.
+  let inFlight = 0;
+  let connections = 0;
+  await withFakeTally(
+    (_req, res) => {
+      inFlight += 1;
+      assert.equal(inFlight, 1, 'two requests reached Tally at once');
+      connections += 1;
+      if (connections === 1) {
+        inFlight -= 1;
+        res.socket?.destroy();
+        return;
+      }
+      setTimeout(() => {
+        inFlight -= 1;
+        res.writeHead(200);
+        res.end(Buffer.from('<ENVELOPE><F01>ok</F01></ENVELOPE>', 'utf16le'));
+      }, 20);
+    },
+    async (port) => {
+      const t = new TallyTransport({ port, encoding: 'utf16le' });
+      const rs = await Promise.all([t.request(probeRequest()), t.request(probeRequest())]);
+      for (const r of rs) assert.ok(r.ok);
+    },
+  );
+});

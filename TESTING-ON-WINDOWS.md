@@ -78,7 +78,7 @@ Now run the test suite. This proves the code arrived intact before you blame Tal
 npm test --workspaces --if-present
 ```
 
-**Expected: about 1,163 tests pass and 0 fail.** If anything fails here, stop and send me the
+**Expected: about 1,216 tests pass and 0 fail.** If anything fails here, stop and send me the
 output — that is a real bug and everything after this point would be misleading.
 
 ---
