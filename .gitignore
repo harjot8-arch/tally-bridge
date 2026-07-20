@@ -32,3 +32,4 @@ apps/bridge/deploy-bundle/
 .claude/agents/
 .claude/proven-config.json
 .claude/.proven-config-version
+ruvector.db
