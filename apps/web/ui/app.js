@@ -233,6 +233,11 @@ function paint(view, first) {
 function drawChart(values, first) {
   const path = document.querySelector('.chart-path');
   const area = document.querySelector('.chart-area');
+  // COLLAPSE the chart, don't just blank it. Clearing `d` left the <svg> at its full
+  // clamp(80px,15vw,120px) height, so a company whose sales have not synced yet showed ~120px of
+  // pure void under a lone em-dash — the first visual pass at 390px read as a broken app rather
+  // than one still syncing. Sections sync independently, so cash-only is a NORMAL first state.
+  path.parentElement?.closest('.svg-chart')?.style.setProperty('display', values && values.length >= 2 ? '' : 'none');
   if (!values || values.length < 2) {
     path.removeAttribute('d');
     area.removeAttribute('d');

@@ -130,16 +130,29 @@ app.whenReady().then(async () => {
     // the real cursor and kills the custom one). Sizing the window small does NOT flip that —
     // Chromium still reports a mouse — so a "phone" screenshot without this is a desktop
     // screenshot in a narrow window. CDP is the only switch for it.
+    //
+    // NON-FATAL, and that matters: this hung the whole run at the first mobile shot, so the
+    // phone — the viewport this dashboard exists for — was the one never captured. A cosmetic
+    // emulation must never be able to block the capture it is decorating. Layout, wrapping and
+    // overflow all come from the window WIDTH, which is set regardless; losing the pointer
+    // emulation costs only the custom-cursor branch.
     if (s.mobile) {
-      win.webContents.debugger.attach('1.3');
-      await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', {
-        features: [
-          { name: 'pointer', value: 'coarse' },
-          { name: 'any-pointer', value: 'coarse' },
-          { name: 'hover', value: 'none' },
-          { name: 'any-hover', value: 'none' },
-        ],
-      });
+      try {
+        win.webContents.debugger.attach('1.3');
+        await Promise.race([
+          win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', {
+            features: [
+              { name: 'pointer', value: 'coarse' },
+              { name: 'any-pointer', value: 'coarse' },
+              { name: 'hover', value: 'none' },
+              { name: 'any-hover', value: 'none' },
+            ],
+          }),
+          new Promise((_r, rej) => setTimeout(() => rej(new Error('CDP timeout')), 5000)),
+        ]);
+      } catch (e) {
+        console.log(`  [warn] pointer emulation unavailable (${e.message}) — layout still real`);
+      }
     }
 
     await win.loadURL(`${ORIGIN}/index.html?only=${s.only}`);
