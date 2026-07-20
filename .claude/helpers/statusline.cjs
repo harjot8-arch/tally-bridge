@@ -638,7 +638,7 @@ function getPkgVersion() {
   // version (see generateStatuslineScript()'s doc comment) — correct even
   // when this renders via a pure npx invocation with no local install for
   // the candidate scan below to find.
-  let ver = "3.32.8";
+  let ver = "3.28.0";
   try {
     const home = os.homedir();
     const pkgPaths = [

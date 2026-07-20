@@ -202,11 +202,22 @@ export async function buildDeployBundle(opts: BuildOptions): Promise<BuildResult
    * now ships beside it; the placeholder index.html below is only the fallback for a dist
    * that predates the UI.
    *
-   * Absent (nobody ran `npm run build` in apps/web) is a WARNING, not a build failure: the API
-   * half of this deployment is complete and useful without a dashboard, and failing the whole
-   * deploy over a missing UI asset would block the Bridge from ever syncing.
+   * We BUILD it here rather than hoping someone already did. `apps/web/dist` is gitignored, so
+   * on a fresh clone "did you remember to run build.mjs" is a step that will eventually be
+   * missed — and the failure is silent: a deployment that serves the API and no dashboard, with
+   * nothing but a console.warn on a machine nobody is watching. Building is deterministic and
+   * takes ~1s, so there is no reason to leave it to memory.
+   *
+   * A build FAILURE is still only a warning, for the original reason: the API half of this
+   * deployment is complete and useful without a dashboard, and failing the whole deploy over a
+   * UI asset would block the Bridge from ever syncing.
    */
   const webDist = join(REPO_ROOT, 'apps/web/dist');
+  try {
+    runNode([join(REPO_ROOT, 'apps/web/build.mjs')], 'apps/web build failed');
+  } catch (e) {
+    console.warn(`deploy bundle: ${(e as Error).message}`);
+  }
   let shippedDataLayer = false;
   let shippedUi = false;
   // index.html/app.js/viewmap.js are the owner's dashboard UI (apps/web/ui, copied into dist

@@ -239,6 +239,36 @@ test('the deploy bundle SHIPS the dashboard data layer beside index.html', () =>
       assert.ok(src.includes(name), `${asset} does not contain ${name}`);
     }
   }
+
+  /*
+   * ...and the OWNER'S DASHBOARD itself, not the "nothing to see here" fallback.
+   *
+   * `apps/web/dist` is gitignored, so on a fresh clone it does not exist. The build therefore
+   * runs `apps/web/build.mjs` ITSELF rather than trusting that someone remembered to — because
+   * the failure mode when nobody did is silent: a deployment serving the API and the fallback
+   * page, with nothing but a console.warn on an unwatched machine. This asserts the real page
+   * shipped, which is only true if the build regenerated dist.
+   */
+  const html = readFileSync(join(staticDir, 'index.html'), 'utf8');
+  assert.ok(
+    !html.includes('nothing to see here'),
+    'the deploy bundle shipped the FALLBACK page — apps/web/dist was not built, so the owner deploys a dashboard-less site',
+  );
+  assert.ok(html.includes('app.js'), 'index.html does not load app.js — the page would render nothing');
+  assert.ok(existsSync(join(staticDir, 'app.js')), 'app.js is missing — index.html would 404 on its own script');
+
+  /*
+   * The shipped page must never carry the simulation from the original design file. Every one of
+   * these is a live defect if it reaches production: Math.random() invents FINANCIAL FIGURES,
+   * a CDN tag is a third-party origin on the passphrase page, and Intl.NumberFormat silently
+   * prints en-US grouping without full ICU (₹1,42,34,110 -> ₹14,234,110).
+   */
+  for (const asset of ['index.html', 'app.js']) {
+    const src = readFileSync(join(staticDir, asset), 'utf8');
+    for (const banned of ['Math.random(', 'cdnjs', 'Intl.NumberFormat']) {
+      assert.ok(!src.includes(banned), `shipped ${asset} contains ${banned}`);
+    }
+  }
 });
 
 /**

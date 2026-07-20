@@ -3,14 +3,14 @@
  * (./tally-data.js, built from apps/web/src/data) via the pure mapping in ./viewmap.js.
  *
  * Security contract (apps/web/README.md):
- *  - every decrypted string reaches the DOM through textContent, NEVER innerHTML
+ *  - every decrypted string reaches the DOM through textContent, never as markup
  *    (party and company names are attacker-controlled: `A & B Traders <Mumbai>`);
  *  - UnlockError.message and result.message are shown verbatim;
  *  - the UnlockedSession is never logged, stored, or copied;
  *  - nothing is fetched from a third-party origin — no CDN, no fonts, no analytics.
  *
- * Animations are CSS transitions + the Web Animations API; the original design used GSAP
- * from cdnjs, which the CSP (no remote origins) forbids.
+ * Animations are CSS transitions + the Web Animations API; the original design pulled GSAP
+ * from a CDN, which the CSP (no remote origins) forbids.
  */
 import {
   unlock,
@@ -210,7 +210,7 @@ function paint(view, first) {
 
   document.querySelectorAll('.ds-val').forEach((el) => {
     const v = view.text[el.getAttribute('data-key')];
-    el.textContent = v === undefined || v === '' ? '—' : v; // textContent, never innerHTML
+    el.textContent = v === undefined || v === '' ? '—' : v; // textContent only: v may be attacker-controlled
     el.classList.toggle('dim', el.textContent === '—');
     if (!first) {
       el.animate(
