@@ -21,6 +21,7 @@
 
 import {
   SPIKE_A_VARIANTS,
+  esc,
   buildRequest,
   expr,
   TallyTransport,
@@ -124,6 +125,10 @@ async function main() {
   log('3. Group collection (the oracle every other probe is checked against)');
   const groupsRes = await transport.request(groupsRequest({ company, booksFrom, asOf }));
   let debtorsHaveBalance = false;
+  // The group's REAL name in this company, captured rather than assumed. Every later probe
+  // that needs to name the debtors group uses this, so a renamed or differently-spaced group
+  // ("Sundry Debtors " with a trailing space is common) cannot be mistaken for a broken query.
+  let debtorGroupName = '';
   if (!groupsRes.ok) {
     bad(describeFailure(groupsRes.failure));
   } else {
@@ -144,6 +149,7 @@ async function main() {
     // response below means "broken query" or "genuinely nobody owes anything".
     const debtors = rows.find((r) => /sundry debtors/i.test(r[0] ?? ''));
     if (debtors) {
+      debtorGroupName = debtors[0] ?? '';
       const bal = debtors[5] ?? '0';
       debtorsHaveBalance = Number(bal) !== 0;
       ok(`Sundry Debtors closing balance is ${debtorsHaveBalance ? 'NON-ZERO' : 'zero'} (${redactAmount(bal)})`);
@@ -407,6 +413,152 @@ async function main() {
       const named = lr.filter((r) => (r[0] ?? '').trim().length > 0).length;
       if (lr.length === 0) bad('  0 debtor ledgers — even the fallback finds nothing');
       else ok(`  ${lr.length} debtor ledgers, ${named} named -> fallback is viable`);
+    }
+  }
+
+  // ---------------------------------------------------------------- 7. name the three suspects
+  //
+  // The ladder narrowed it to three INDEPENDENT failures, and stage 5 could not have separated
+  // any of them:
+  //
+  //   1. `Bills` BARE returns 141 rows -> the collection exists and is full. Adding CHILDOF
+  //      $$GroupSundryDebtors empties it. But $$GroupCash works (stage 4), so filters and
+  //      reserved group functions work in general — it is THIS reserved name that fails. The
+  //      ledger fallback used it too, which is why that returned nothing either. One suspect,
+  //      two symptoms.
+  //   2. The FILTER alone empties it, and it names $ClosingBalance — which RENDERS fine as a
+  //      field on the same objects. A value can be visible in field context and unavailable in
+  //      filter context; that is a different bug from a wrong field name.
+  //   3. $PartyName is empty on a bare bill. The other two party methods have still never been
+  //      tried WITHOUT CHILDOF, so they are not eliminated — they were only ever tested
+  //      alongside a clause that emptied the collection first.
+  //
+  // Each block below changes exactly one thing against a known-good baseline.
+  if (winners.length === 0 && debtorsHaveBalance) {
+    log();
+    log('='.repeat(72));
+    log('7. Naming the suspects');
+    log('='.repeat(72));
+
+    const quoted = (s: string) => `"${esc(s)}"`;
+    const runProbe = async (
+      fields: Parameters<typeof buildRequest>[0]['fields'],
+      collection: Parameters<typeof buildRequest>[0]['collection'],
+      systemFormulae?: Record<string, string>,
+    ): Promise<string[][]> => {
+      const res = await transport.request(
+        buildRequest({
+          id: 'TSSuspect',
+          company,
+          fromDate: booksFrom,
+          toDate: asOf,
+          fields,
+          collection,
+          ...(systemFormulae ? { systemFormulae } : {}),
+        }),
+      );
+      return res.ok ? xmlTagResponseToRows(res.xml) : [];
+    };
+
+    // ---- 7a. Does $$GroupSundryDebtors resolve to anything this company has? ----------
+    log();
+    log(`7a. The reserved name. This company's debtors group is: ${redact(debtorGroupName)}`);
+    const nameField = [{ tag: 'F01', set: expr.text('$Name') }];
+    const byReserved = await runProbe(
+      nameField,
+      { type: 'Group', fetch: ['Name'], filter: 'F' },
+      { F: '$$IsEqual:$Name:$$GroupSundryDebtors' },
+    );
+    const byLiteral = debtorGroupName
+      ? await runProbe(
+          nameField,
+          { type: 'Group', fetch: ['Name'], filter: 'F' },
+          { F: `$$IsEqual:$Name:${quoted(debtorGroupName)}` },
+        )
+      : [];
+    if (byReserved.length > 0) ok(`$$GroupSundryDebtors matches ${byReserved.length} group(s)`);
+    else bad('$$GroupSundryDebtors matches NOTHING -> the reserved name is the bug');
+    if (byLiteral.length > 0) ok(`the literal group name matches ${byLiteral.length} group(s) -> usable substitute`);
+    else bad('even the literal group name matches nothing -> $$IsEqual on $Name is the bug');
+
+    // ---- 7b. Party method, against the BARE collection that actually returns rows -----
+    log();
+    log('7b. Party method, tested against BARE Bills (the 141-row baseline):');
+    for (const m of ['$PartyName', '$LedgerName', '$..Name', '$Parent', '$BillParty']) {
+      const rws = await runProbe(
+        [
+          { tag: 'F01', set: expr.text('$Name') },
+          { tag: 'F02', set: expr.text(m) },
+        ],
+        { type: 'Bills', fetch: ['Name', 'ClosingBalance'] },
+      );
+      const named = rws.filter((r) => (r[1] ?? '').trim().length > 0).length;
+      if (named > 0) {
+        ok(`${m.padEnd(12)} -> ${named}/${rws.length} named   sample: ${redact(rws.find((r) => (r[1] ?? '').trim())?.[1] ?? '')}`);
+      } else {
+        bad(`${m.padEnd(12)} -> ${rws.length} rows, 0 named`);
+      }
+    }
+
+    // ---- 7c. Scoping to debtors WITHOUT the reserved name ----------------------------
+    log();
+    log('7c. Scoping to debtors without $$GroupSundryDebtors:');
+    if (debtorGroupName) {
+      const byChildOf = await runProbe(
+        [
+          { tag: 'F01', set: expr.text('$Name') },
+          { tag: 'F02', set: expr.amount('$ClosingBalance') },
+        ],
+        { type: 'Bills', childOf: quoted(debtorGroupName), belongsTo: true, fetch: ['Name', 'ClosingBalance'] },
+      );
+      if (byChildOf.length > 0) ok(`CHILDOF "<literal group name>" -> ${byChildOf.length} bills`);
+      else bad('CHILDOF with the literal name -> 0 bills');
+
+      for (const [label, f] of [
+        ['$$IsLedOfGrp on the literal name', `$$IsLedOfGrp:$Name:${quoted(debtorGroupName)}`],
+        ['$_PrimaryGroup equals it', `$$IsEqual:$_PrimaryGroup:${quoted(debtorGroupName)}`],
+        ['$Parent equals it', `$$IsEqual:$Parent:${quoted(debtorGroupName)}`],
+      ] as const) {
+        const rws = await runProbe(
+          [
+            { tag: 'F01', set: expr.text('$Name') },
+            { tag: 'F02', set: expr.amount('$ClosingBalance') },
+          ],
+          { type: 'Ledger', fetch: ['Name', 'Parent', 'ClosingBalance'], filter: 'F' },
+          { F: f },
+        );
+        if (rws.length > 0) ok(`Ledger, ${label} -> ${rws.length} debtor ledgers`);
+        else bad(`Ledger, ${label} -> 0`);
+      }
+    } else {
+      warn('no debtors group name captured in stage 3 — cannot test the literal-name route');
+    }
+
+    // ---- 7d. Is $ClosingBalance usable in FILTER context on a bill? ------------------
+    log();
+    log('7d. Why the filter empties a full collection:');
+    const bare = await runProbe(
+      [
+        { tag: 'F01', set: expr.text('$Name') },
+        { tag: 'F02', set: expr.amount('$ClosingBalance') },
+      ],
+      { type: 'Bills', fetch: ['Name', 'ClosingBalance'] },
+    );
+    const nonZeroInField = bare.filter((r) => Number(r[1] ?? '0') !== 0).length;
+    log(`    ${nonZeroInField}/${bare.length} bills have a NON-ZERO $ClosingBalance as a FIELD`);
+    for (const [label, f] of [
+      ['NOT $$IsZero:$ClosingBalance', 'NOT $$IsZero:$ClosingBalance'],
+      ['NOT $$IsZero:$$NumValue:$ClosingBalance', 'NOT $$IsZero:$$NumValue:$ClosingBalance'],
+      ['$$IsBillOutstanding', '$$IsBillOutstanding'],
+      ['NOT $$IsEmpty:$Name (a control that must pass)', 'NOT $$IsEmpty:$Name'],
+    ] as const) {
+      const rws = await runProbe(
+        [{ tag: 'F01', set: expr.text('$Name') }],
+        { type: 'Bills', fetch: ['Name', 'ClosingBalance'], filter: 'F' },
+        { F: f },
+      );
+      if (rws.length > 0) ok(`filter ${label} -> ${rws.length} rows`);
+      else bad(`filter ${label} -> 0 rows`);
     }
   }
 
