@@ -21,6 +21,8 @@
 
 import {
   SPIKE_A_VARIANTS,
+  buildRequest,
+  expr,
   TallyTransport,
   TIMEOUTS,
   cashBankRequest,
@@ -276,6 +278,136 @@ async function main() {
     log('  Send this output back. The next things to try are widening the collection');
     log('  (drop CHILDOF/BELONGSTO) and dumping the raw response to inspect what Tally');
     log('  actually returns for a bill object.');
+  }
+
+  // ---------------------------------------------------------------- 6. isolation ladder
+  //
+  // Only runs when stage 5 found nothing, and only when there ARE debtors to find — otherwise
+  // it is noise. Stage 5 varies the collection TYPE and the party METHOD, and holds three other
+  // clauses constant: CHILDOF, BELONGSTO and FILTER. Any one of those three can empty a
+  // collection on its own, silently, and stage 5 cannot tell them apart.
+  //
+  // So: strip the request to nothing and add one clause back at a time. The first probe that
+  // returns zero names the clause that is wrong. This is the difference between knowing and
+  // guessing, and the guessing costs a round trip to a Windows PC every time.
+  if (winners.length === 0 && debtorsHaveBalance) {
+    log();
+    log('='.repeat(72));
+    log('6. Isolation ladder — WHICH clause empties the collection?');
+    log('='.repeat(72));
+    log();
+
+    const ladder: Array<{ label: string; collection: Parameters<typeof buildRequest>[0]['collection']; systemFormulae?: Record<string, string> }> = [
+      {
+        label: 'A. Bills, BARE (no CHILDOF, no BELONGSTO, no FILTER)',
+        collection: { type: 'Bills', fetch: ['Name', 'PartyName', 'ClosingBalance', 'BillDate'] },
+      },
+      {
+        label: 'B. Bills + CHILDOF only',
+        collection: {
+          type: 'Bills',
+          childOf: '$$GroupSundryDebtors',
+          fetch: ['Name', 'PartyName', 'ClosingBalance', 'BillDate'],
+        },
+      },
+      {
+        label: 'C. Bills + CHILDOF + BELONGSTO',
+        collection: {
+          type: 'Bills',
+          childOf: '$$GroupSundryDebtors',
+          belongsTo: true,
+          fetch: ['Name', 'PartyName', 'ClosingBalance', 'BillDate'],
+        },
+      },
+      {
+        label: 'D. Bills + FILTER only (NOT $$IsZero:$ClosingBalance)',
+        collection: {
+          type: 'Bills',
+          fetch: ['Name', 'PartyName', 'ClosingBalance', 'BillDate'],
+          filter: 'FltrOpen',
+        },
+        systemFormulae: { FltrOpen: 'NOT $$IsZero:$ClosingBalance' },
+      },
+    ];
+
+    let bareXml = '';
+    for (const step of ladder) {
+      const xml = buildRequest({
+        id: 'TSLadder',
+        company,
+        fromDate: booksFrom,
+        toDate: asOf,
+        fields: [
+          { tag: 'F01', set: expr.text('$Name') },
+          { tag: 'F02', set: expr.text('$PartyName') },
+          { tag: 'F03', set: expr.amount('$ClosingBalance') },
+        ],
+        collection: step.collection,
+        ...(step.systemFormulae ? { systemFormulae: step.systemFormulae } : {}),
+      });
+      const res = await transport.request(xml);
+      if (!res.ok) {
+        bad(`${step.label} -> ${describeFailure(res.failure)}`);
+        continue;
+      }
+      const rws = xmlTagResponseToRows(res.xml);
+      const named = rws.filter((r) => (r[1] ?? '').trim().length > 0).length;
+      if (rws.length === 0) {
+        bad(`${step.label} -> 0 rows`);
+      } else {
+        ok(`${step.label} -> ${rws.length} rows, ${named} with a party name`);
+        if (!bareXml) bareXml = res.xml;
+      }
+    }
+
+    // What does a bill object actually look like here? Tag structure only — every value is
+    // replaced by its shape, so this stays safe to paste back even though it is live books.
+    log();
+    log('  Raw response shape (tags kept, every VALUE redacted to its length):');
+    const sample = bareXml || '';
+    if (!sample) {
+      log('    (no probe returned rows — nothing to dump)');
+    } else {
+      const shape = sample
+        .replace(/>([^<]+)</g, (_m, val: string) => `>${redact(val)}<`)
+        .slice(0, 1200);
+      for (const line of shape.match(/.{1,100}/g) ?? []) log(`    ${line}`);
+    }
+
+    // The degraded mode, and worth knowing independently: even with no bill-level ageing we can
+    // still answer "who owes me" at LEDGER grain. That is a real product, just without "how
+    // late". If this works and the ladder does not, the feature ships reduced rather than not
+    // at all — so this is the fallback question, asked while we have a real Tally in front of us.
+    log();
+    log('  Fallback — party balances at LEDGER grain (no ageing, but "who owes me"):');
+    const ledgerRes = await transport.request(
+      buildRequest({
+        id: 'TSDebtorLedgers',
+        company,
+        fromDate: booksFrom,
+        toDate: asOf,
+        fields: [
+          { tag: 'F01', set: expr.text('$Name') },
+          { tag: 'F02', set: expr.amount('$ClosingBalance') },
+        ],
+        collection: {
+          type: 'Ledger',
+          fetch: ['Name', 'Parent', 'ClosingBalance'],
+          filter: 'FltrDebtors',
+        },
+        systemFormulae: {
+          FltrDebtors: '$$IsLedOfGrp:$Name:$$GroupSundryDebtors AND NOT $$IsZero:$ClosingBalance',
+        },
+      }),
+    );
+    if (!ledgerRes.ok) {
+      bad(`  ${describeFailure(ledgerRes.failure)}`);
+    } else {
+      const lr = xmlTagResponseToRows(ledgerRes.xml);
+      const named = lr.filter((r) => (r[0] ?? '').trim().length > 0).length;
+      if (lr.length === 0) bad('  0 debtor ledgers — even the fallback finds nothing');
+      else ok(`  ${lr.length} debtor ledgers, ${named} named -> fallback is viable`);
+    }
   }
 
   log();
