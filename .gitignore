@@ -23,3 +23,12 @@ apps/bridge/deploy-bundle/
 .swarm/
 .claude-flow/
 .hive-mind/
+
+# Ruflo / claude-flow vendored tooling — 44MB of plugin files, not project source.
+# Committed by accident; untracked below. Files stay on disk, they just leave git.
+.agents/
+.claude/commands/
+.claude/helpers/
+.claude/agents/
+.claude/proven-config.json
+.claude/.proven-config-version
