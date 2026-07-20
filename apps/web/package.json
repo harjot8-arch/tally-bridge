@@ -9,7 +9,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
     "test": "node --test --experimental-strip-types test/*.test.ts",
     "visual": "npm run build && electron scripts/visual-harness.mjs",
-    "pretest": "cd ../.. && npm run build -w @tally-bridge/core -w @tally-bridge/crypto -w @tally-bridge/protocol -w @tally-bridge/viewmodel"
+    "pretest": "cd ../.. && npm run build -w @tally-bridge/core && npm run build -w @tally-bridge/crypto && npm run build -w @tally-bridge/protocol && npm run build -w @tally-bridge/viewmodel"
   },
   "dependencies": {
     "@tally-bridge/core": "*",
