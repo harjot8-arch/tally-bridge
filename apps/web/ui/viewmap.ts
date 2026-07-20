@@ -89,6 +89,47 @@ export function mapCompany(cards: Partial<CompanyCards>, fmt: Formatters): Compa
   text['rcvOverduePct'] = rp === null ? EM : `${rp}%`;
   scales['rcvOverduePct'] = rp ?? 0;
 
+  // AGEING — "how late", the half of the question the party list does not answer.
+  //
+  // Buckets come from the card's own `buckets[]`, which the card layer built from the
+  // AUTHORITATIVE `totals[]` rows, never from the truncated party matrix (ARCHITECTURE.md: a
+  // total must not follow a display decision). Receivables are Dr, so the card has already
+  // flipped them to read positive — `pct` refuses anything negative, so a sign regression
+  // upstream renders a blank bar rather than a confident wrong one.
+  //
+  // Four bands, not six: at 390px six segments are ~4px each and communicate nothing. 90+ is the
+  // merge because it is the band that changes what the owner does today.
+  const bucketPaise = (...names: string[]): number | undefined => {
+    const bs = rcv?.buckets;
+    if (!bs) return undefined;
+    let sum = 0;
+    let seen = false;
+    for (const b of bs) {
+      if (names.includes(b.bucket)) { sum += b.amount.paise; seen = true; }
+    }
+    return seen ? sum : undefined;
+  };
+  const bands: Array<[string, number | undefined]> = [
+    ['Not due', bucketPaise('not_due')],
+    ['0–30 days', bucketPaise('0_30')],
+    ['31–90 days', bucketPaise('31_60', '61_90')],
+    ['Over 90 days', bucketPaise('91_180', '180_plus')],
+  ];
+  const bandTotal = rcv?.total.paise;
+  let bandUsed = 0;
+  bands.forEach(([, p], i) => {
+    const s = p !== undefined && p > 0 && bandTotal !== undefined && bandTotal > 0
+      ? Math.min(100 - bandUsed, Math.round((p / bandTotal) * 100))
+      : 0;
+    widths[`age${i + 1}`] = s;
+    bandUsed += s;
+  });
+  // Name the worst band that actually holds money — the single line worth reading.
+  const worst = [...bands].reverse().find(([, p]) => p !== undefined && p > 0);
+  const worstAmt = worst?.[1];
+  text['ageWorstName'] = worst && worstAmt !== undefined ? `Oldest — ${worst[0]}` : '';
+  text['ageWorst'] = worst && worstAmt !== undefined ? fmt.formatMoney(worstAmt / 100) : '';
+
   // ---- cash & bank (cash_bank, LEDGER grain with real names) --------------------------
   // The card gives a combined total and per-ledger balances; the bank/cash split is not a
   // card field, so it is derived here in exact integer paise and formatted exactly once —

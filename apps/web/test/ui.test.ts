@@ -219,6 +219,25 @@ test('mapping: real figures land on the right keys with Indian grouping', () => 
   assert.equal(v.text['rcvOverduePct'], '42%');
   assert.equal(v.scales['rcvOverduePct'], 42);
 
+  /*
+   * AGEING — "how late", the half of the question the party list cannot answer, and the reason
+   * this product exists rather than a list of debtors.
+   *
+   * The fixture holds ₹3,50,000 not due and ₹2,50,000 at 91–180 days, ₹6,00,000 total. Bands are
+   * merged 4-wide for a 390px screen, so 31_60+61_90 (empty here) collapse to one segment and
+   * 91_180+180_plus to another.
+   *
+   * The shares are asserted EXACTLY, not just "non-zero": a bar that renders is not a bar that is
+   * right, and a sign regression upstream (receivables are Dr on the wire) would show as an empty
+   * bar rather than a confident wrong one — `pct` refuses negatives.
+   */
+  assert.equal(v.widths['age1'], 58); // not due — 3,50,000 / 6,00,000
+  assert.equal(v.widths['age2'], 0); // 0–30: nothing in this bucket
+  assert.equal(v.widths['age3'], 0); // 31–90: nothing
+  assert.equal(v.widths['age4'], 42); // over 90 — the band that changes behaviour
+  assert.equal(v.text['ageWorstName'], 'Oldest — Over 90 days');
+  assert.equal(v.text['ageWorst'], '₹2,50,000');
+
   // Cash & bank (cash_bank, LEDGER grain): REAL ledger names, never "Operating/Payroll/Reserve".
   assert.equal(v.text['bank'], '₹60,00,000');
   assert.equal(v.text['cash'], '₹45,000');

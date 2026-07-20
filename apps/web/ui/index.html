@@ -161,7 +161,17 @@
         .viz-fill.secondary { background: var(--text-light); }
 
         /* A figure whose section has not synced renders as a dimmed em dash, never a number. */
+        /*
+          The "no data yet" placeholder.
+
+          At hero size an em-dash is ~60px of solid horizontal bar, which reads as a rule or a
+          redaction, not as "still syncing" — the first visual pass at 390px looked like a broken
+          app. Sections sync independently, so a company with only cash & bank is a NORMAL first
+          state and must look deliberate. Shrinking the placeholder to body size (while the slot
+          keeps the hero's line-height) makes the gap read as intentional emptiness.
+        */
         .dim { opacity: 0.3; }
+        .val-hero.dim, .val-primary.dim { font-size: 1.5rem; letter-spacing: 0; }
 
         /* SVG Chart - GPU forced */
         .svg-chart { width: 100%; height: clamp(80px, 15vw, 120px); margin-top: 1.5rem; overflow: visible; transform: translateZ(0); }
@@ -272,6 +282,33 @@
                     <div class="ledger-row" data-slot><span class="micro-heading ds-val" data-key="rcvP1Name"></span><span class="val-micro ds-val" data-key="rcvP1"></span></div>
                     <div class="ledger-row" data-slot><span class="micro-heading ds-val" data-key="rcvP2Name"></span><span class="val-micro ds-val" data-key="rcvP2"></span></div>
                     <div class="ledger-row" data-slot><span class="micro-heading ds-val" data-key="rcvP3Name"></span><span class="val-micro ds-val" data-key="rcvP3"></span></div>
+                </div>
+
+                <!--
+                  AGEING. "Who owes me" is only half the question a business owner actually has;
+                  the other half is "how late", and it is the one Tally makes hardest to see.
+                  Same segmented-bar primitive as Vendor Concentration above, so it reads as part
+                  of the same design rather than bolted on.
+
+                  Four segments, not the six buckets the pipeline carries: at 390px six segments
+                  are each ~4px wide and say nothing. 61_90 and 91_180 and 180_plus are merged
+                  into one "90+" band, which is also the band that actually changes behaviour —
+                  that is the money you chase this week.
+                -->
+                <div style="margin-top: 1.5rem;">
+                    <div class="flex-between">
+                        <span class="micro-heading">Ageing</span>
+                        <span class="micro-heading">Not Due &rarr; 90+ Days</span>
+                    </div>
+                    <div class="segmented-bar">
+                        <div class="segment seg-4 ds-w" data-key="age1"></div>
+                        <div class="segment seg-3 ds-w" data-key="age2"></div>
+                        <div class="segment seg-2 ds-w" data-key="age3"></div>
+                        <div class="segment seg-1 ds-w" data-key="age4"></div>
+                    </div>
+                    <div class="ledger-list" style="margin-top: 1rem;">
+                        <div class="ledger-row" data-slot><span class="micro-heading ds-val" data-key="ageWorstName"></span><span class="val-micro ds-val" data-key="ageWorst"></span></div>
+                    </div>
                 </div>
 
                 <div style="margin-top: 1.5rem;">

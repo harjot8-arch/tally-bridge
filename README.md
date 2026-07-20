@@ -28,6 +28,15 @@ npm test          # 332+ tests
 Requires Node 22+. Tests run the TypeScript sources directly via `--experimental-strip-types`;
 no build step needed to test.
 
+## Testing on a real Windows PC
+
+**→ [`TESTING-ON-WINDOWS.md`](TESTING-ON-WINDOWS.md)** is the step-by-step guide: turning on
+Tally's connector, running the app, checking every figure against Tally itself, and what to report
+back. Written for someone who has not read this codebase.
+
+Start with Part 3 (`npm run spike:tally`) — it takes two minutes and closes the single largest
+remaining unknown in the product.
+
 ## What you need to run against real Tally
 
 Two things cannot be answered from code. Both need ten minutes and real credentials.
