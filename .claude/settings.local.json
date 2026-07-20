@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -fsSL https://cdn.jsdelivr.net/gh/ruvnet/ruflo@main/scripts/install.sh -o /private/tmp/claude-501/-Users-hsa-Desktop-Tally/2061b886-bee3-4f80-b08d-1de41f96830e/scratchpad/install.sh)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(bash /private/tmp/claude-501/-Users-hsa-Desktop-Tally/2061b886-bee3-4f80-b08d-1de41f96830e/scratchpad/install.sh --no-init 2>&1)",
+      "Bash(echo \"=== marketplace / plugin manifests ===\")",
+      "Bash(grep -iE 'marketplace\\\\.json|\\\\.claude-plugin|plugin\\\\.json' /Users/hsa/.claude/projects/-Users-hsa-Desktop-Tally/2061b886-bee3-4f80-b08d-1de41f96830e/tool-results/bjwsjaebh.txt)",
+      "Bash(curl -fsSL \"https://api.github.com/repos/ruvnet/ruflo/contents/.claude-plugin\")",
+      "Bash(python3 -c \"import sys,json; [print\\(' ', i['name'], i['type'], i.get\\('size',''\\)\\) for i in json.load\\(sys.stdin\\)]\")",
+      "Bash(curl -fsSL \"https://raw.githubusercontent.com/ruvnet/ruflo/main/.claude-plugin/marketplace.json\")",
+      "Bash(claude plugin *)",
+      "Bash(echo \"---exit: $?\")",
+      "Bash(echo \"--- exists check: $?\")",
+      "Bash(grep -v 'SKILL\\\\.md$')",
+      "Bash(curl -fsSL \"https://api.github.com/repos/ruvnet/ruflo/git/trees/main?recursive=1\" -o tree.json)",
+      "Bash(python3 -c ' *)",
+      "Bash(curl -fsSL --http1.1 --retry 3 \"https://api.github.com/repos/ruvnet/ruflo/git/trees/main?recursive=1\" -o tree.json)",
+      "Skill(dataviz)",
+      "Bash(node scripts/validate_palette.js \"#1c4f8a,#2e6b2e,#b4436c,#c98a00,#0f7d6b,#c9541f,#5a3fa0,#b3272d\" --mode light --surface \"#f4efe3\")"
+    ]
+  },
+  "enabledPlugins": {
+    "ponytail@ponytail": true,
+    "superpowers@superpowers-marketplace": true,
+    "open-code-review@open-code-review": true,
+    "security-guidance@claude-plugins-official": true
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "tally-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Tally Bridge — end-to-end encrypted financial dashboard for TallyPrime / Tally.ERP 9",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "build:deploy-bundle": "node --experimental-strip-types scripts/build-deploy-bundle.ts",
+    "spike:tally": "node --experimental-strip-types scripts/spike-a-ageing.ts"
+  },
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "esbuild": "0.28.1"
+  }
+}

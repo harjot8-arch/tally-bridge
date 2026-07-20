@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    // NOTE: deliberately ES2022 only — NO "DOM".
+    //
+    // This is enforcement, not preference. If someone reaches for `document`, `window`, or any
+    // browser API in this package, the build fails. That is what keeps this layer reusable by
+    // React Native (which has no DOM) and what keeps the mobile decision open.
+    "lib": ["ES2022"]
+  },
+  "include": ["src/**/*"]
+}

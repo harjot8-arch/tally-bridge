@@ -1,0 +1,395 @@
+/*
+ * Setup wizard styling.
+ *
+ * The audience is a 45–65 year old business owner who is deciding, on this screen, whether this
+ * software is for them. So the constraints are not taste:
+ *
+ *   - IT SHOULD FEEL LIKE A BANK, NOT A DEV TOOL. One column, generous whitespace, one thing to
+ *     read and one thing to do. No dense panels, no monospace anywhere except the recovery words
+ *     (where per-character legibility is the entire job).
+ *   - BODY TEXT IS 17px, NOT 14px. This gets read under a tube light in a back office, possibly
+ *     by someone whose reading glasses are in the other room. Hindi needs the extra line-height
+ *     too: matras sit above and below the baseline and clip at the leading a Latin face gets away
+ *     with.
+ *   - NO HOVER-ONLY AFFORDANCES. Some of these machines are touchscreen POS terminals.
+ *   - LOCAL FONTS ONLY. CSP allows no remote origin, and there is no CDN to fall back to. The
+ *     system UI stack is what ships.
+ *
+ * Variables come from styles.css, which owns the palette. This file adds none of its own colours
+ * beyond the two the wizard needs and the dashboard has no concept of.
+ */
+
+.wz {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+}
+
+/* ---------------------------------------------------------------- chrome */
+
+.wz-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.wz-step {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.wz-steplabel {
+  flex: 1;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.wz-langs {
+  display: flex;
+  gap: 4px;
+}
+
+.wz-lang {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  padding: 5px 12px;
+}
+
+.wz-lang.is-selected {
+  background: var(--card);
+  border-color: var(--neutral);
+  color: var(--text);
+}
+
+/* ---------------------------------------------------------------- the card */
+
+.wz-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px;
+}
+
+.wz-title {
+  font-size: 26px;
+  font-weight: 650;
+  line-height: 1.3;
+  margin: 0 0 12px;
+}
+
+.wz-p {
+  color: var(--text);
+  font-size: 17px;
+  /* Hindi matras clip at 1.4. This is not a rounding of the Latin value. */
+  line-height: 1.65;
+  margin: 0 0 12px;
+}
+
+.wz-tone-problem .wz-title,
+.wz-tone-waiting .wz-title {
+  font-size: 22px;
+}
+
+/* ---------------------------------------------------------------- notes
+ *
+ * `hard` carries a consequence that must not be softened: there is no passphrase reset, and the
+ * free Vercel plan is not licensed for a business. `soft` is the floor underneath it — the
+ * reassurance that keeps the hard note from reading as a threat.
+ *
+ * They are deliberately NOT red. A red box says "you did something wrong"; these say "this is how
+ * it works". Red here would push an owner out of setup, and the fact is not an error.
+ */
+
+.wz-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.wz-note {
+  border-left: 3px solid var(--border);
+  border-radius: 0 8px 8px 0;
+  padding: 12px 16px;
+}
+
+.wz-note-hard {
+  background: color-mix(in srgb, var(--warn) 9%, transparent);
+  border-left-color: var(--warn);
+}
+
+.wz-note-soft {
+  background: color-mix(in srgb, var(--neutral) 8%, transparent);
+  border-left-color: var(--neutral);
+}
+
+.wz-note-title {
+  font-size: 15px;
+  font-weight: 650;
+  margin-bottom: 4px;
+}
+
+.wz-note-body {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* ---------------------------------------------------------------- companies */
+
+.wz-companies {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 20px 0;
+}
+
+.wz-company {
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 17px;
+  padding: 14px 16px;
+  text-align: left;
+}
+
+.wz-company.is-selected {
+  border-color: var(--neutral);
+  box-shadow: inset 0 0 0 1px var(--neutral);
+}
+
+.wz-company-name {
+  /* A company name comes out of someone's Tally file. It can be long, and it can be one
+     unbroken token; it must wrap rather than push the card sideways. */
+  overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------- fields */
+
+.wz-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 20px 0;
+}
+
+.wz-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wz-field-label {
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.wz-input {
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font: inherit;
+  font-size: 17px;
+  padding: 12px 14px;
+  width: 100%;
+}
+
+.wz-input:focus {
+  border-color: var(--neutral);
+  outline: 2px solid color-mix(in srgb, var(--neutral) 40%, transparent);
+  outline-offset: 1px;
+}
+
+/* A pasted Vercel token is a long opaque string; a recovery word is short and must be read
+   character by character. Both want the monospace face, for different reasons. */
+.wz-field-token .wz-input,
+.wz-field-word .wz-input {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  letter-spacing: 0.02em;
+}
+
+.wz-field-word {
+  max-width: 260px;
+}
+
+/* ---------------------------------------------------------------- progress
+ *
+ * ONE bar, one sentence. The sentence comes from the provisioner itself and is already written
+ * for this reader ("Creating your database…"), never a step name — `provision_database` is our
+ * vocabulary and reads as a leaked internal.
+ */
+
+.wz-progress {
+  margin: 24px 0;
+}
+
+.wz-track {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.wz-fill {
+  background: var(--neutral);
+  height: 100%;
+  /* Slow enough to read as motion rather than a jump; this bar is the only thing telling the
+     owner the app has not frozen. */
+  transition: width 400ms ease-out;
+}
+
+.wz-progress-label {
+  color: var(--muted);
+  font-size: 15px;
+  margin-top: 10px;
+}
+
+/* ---------------------------------------------------------------- recovery sheet
+ *
+ * The QR is PRIMARY and the words are the fallback: recovery by phone camera beats typing 24
+ * English words, and this audience is not English-first.
+ */
+
+.wz-sheet {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin: 20px 0;
+  padding: 20px;
+}
+
+.wz-qr {
+  text-align: center;
+}
+
+.wz-qr-img {
+  background: #fff;
+  border-radius: 8px;
+  /* Padding matters: a QR printed or shown edge-to-edge loses its quiet zone and scanners
+     refuse it. */
+  padding: 10px;
+  width: 180px;
+  height: 180px;
+}
+
+.wz-qr-cap,
+.wz-words-cap {
+  color: var(--muted);
+  font-size: 15px;
+  margin: 10px 0;
+}
+
+.wz-words-cap {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.wz-words {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px 12px;
+}
+
+.wz-word {
+  align-items: baseline;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.wz-word-n {
+  color: var(--muted);
+  flex: none;
+  font-size: 12px;
+  text-align: right;
+  width: 18px;
+}
+
+.wz-word-w {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------- buttons */
+
+.wz-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+.wz-btn {
+  border-radius: 10px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 600;
+  /* 48px tall. This is a finger target on a POS terminal, not a mouse target. */
+  padding: 13px 22px;
+}
+
+.wz-btn-primary {
+  background: var(--neutral);
+  border: 1.5px solid var(--neutral);
+  color: #06101c;
+}
+
+.wz-btn-secondary {
+  background: transparent;
+  border: 1.5px solid var(--border);
+  color: var(--text);
+}
+
+.wz-btn:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+@media (max-width: 560px) {
+  .wz {
+    padding: 20px 14px 48px;
+  }
+
+  .wz-card {
+    padding: 20px;
+  }
+
+  .wz-words {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .wz-buttons {
+    flex-direction: column-reverse;
+  }
+
+  .wz-btn {
+    width: 100%;
+  }
+}
+
+/*
+ * Respect the OS setting. The progress bar is the only animation here, and for a user who has
+ * asked for less motion a bar that snaps is not a downgrade.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .wz-fill {
+    transition: none;
+  }
+}

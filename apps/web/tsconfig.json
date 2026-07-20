@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "noEmit": true,
+    // This code runs in a browser (and its build script in Node). DOM is a statement of fact:
+    // the UI layer uses document/Worker, and the data layer uses fetch/CompressionStream —
+    // exactly the same lib set packages/crypto compiles under.
+    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+  },
+  "include": ["src/**/*"]
+}

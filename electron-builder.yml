@@ -1,0 +1,76 @@
+# Packaging and auto-update.
+#
+# Windows is the only target that matters: this ships to a business PC running Tally, and Tally
+# is Windows-only. macOS config exists for development, not distribution.
+
+appId: com.tallybridge.app
+productName: Tally Bridge
+copyright: Copyright © 2026
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - dist/**/*
+  - package.json
+  # The prebuilt server bundle the setup wizard deploys to the client's Vercel account.
+  # Produced by `npm run build:deploy-bundle` (run it before packaging); loadDeployBundle()
+  # fails the wizard with a plain sentence if a build shipped without it.
+  - deploy-bundle/**/*
+  # node_modules is pulled in automatically for production deps only.
+
+# better-sqlite3 is a native module and must be rebuilt against Electron's ABI, not Node's.
+# Without this the app starts and then dies on the first database call with a confusing
+# NODE_MODULE_VERSION mismatch.
+npmRebuild: true
+
+asar: true
+asarUnpack:
+  # Native .node binaries cannot be loaded from inside an asar archive.
+  - "**/*.node"
+  - "**/better_sqlite3.node"
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  # SIGNING — read this before spending money.
+  #
+  # Use an OV certificate (~$230/yr). Do NOT buy EV: Microsoft removed EV's SmartScreen bypass
+  # in 2024, so EV-signed files now build reputation exactly like OV ones. Paying the EV premium
+  # (~$400+/yr) to avoid SmartScreen warnings no longer works.
+  #
+  # The private key must live on a hardware token or cloud HSM (CA/Browser Forum, June 2023), so
+  # signing cannot happen on an unattended CI runner without an HSM integration.
+  #
+  # From 1 Mar 2026 certificates cap at 458 days validity — diarise renewal.
+  #
+  # signtoolOptions:
+  #   certificateSubjectName: "Your Company Pvt Ltd"
+  #   signingHashAlgorithms: [sha256]
+  publisherName: Tally Bridge
+
+nsis:
+  # Per-user install: no admin rights, no UAC prompt, and the app lands in the user's profile
+  # where its DPAPI-sealed keys can actually be read. A machine-wide install would break the
+  # keystore's per-user scoping.
+  perMachine: false
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  # The installer does NOT add a Run entry. The app registers its own auto-start via
+  # app.setLoginItemSettings on first launch, so uninstalling cleans up after itself.
+
+mac:
+  target: [dmg]
+  category: public.app-category.finance
+  # Development only. Distribution would need notarization.
+
+publish:
+  # electron-updater checks this feed. Updates must be signed and served over HTTPS; the
+  # updater verifies the signature and refuses unsigned or mismatched artifacts.
+  provider: generic
+  url: https://updates.example.invalid/tally-bridge
+  channel: latest

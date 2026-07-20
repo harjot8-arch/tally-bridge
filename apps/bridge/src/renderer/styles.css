@@ -1,0 +1,814 @@
+/*
+ * The dashboard.
+ *
+ * Design constraints specific to this audience, not general taste:
+ *
+ *   - Numbers are the product. They get the largest type on the screen and they use tabular
+ *     figures, so digits line up and do not jitter when a sync lands.
+ *   - Tones are semantic (good/warn/bad/neutral) and are mapped to colour HERE and nowhere
+ *     else. `packages/viewmodel` returns tones, never colours — that is what lets a future
+ *     mobile surface pick its own palette without touching a line of logic.
+ *   - Colour is never the only signal. Roughly one man in twelve is red/green colourblind, and
+ *     this app is read almost entirely by men over forty-five. Every tone dot sits beside a
+ *     word, every chart beside its numbers.
+ *   - No hover-only affordances. This gets glanced at, sometimes on a touchscreen POS terminal.
+ *   - No remote fonts, no remote anything: the CSP forbids it and the app must paint identically
+ *     on an offline shop PC.
+ *
+ * Motion is calm and short, and all of it is off under prefers-reduced-motion — see the bottom
+ * of the file. Nothing here animates a NUMBER: a figure that counts up is a figure you cannot
+ * read for the second it is wrong.
+ */
+
+:root {
+  --bg: #0b0f14;
+  --bg-elev: #0e141b;
+  --card: #131a23;
+  --card-hover: #18212c;
+  --border: #22303f;
+  --text: #e6edf3;
+  --muted: #9fb0c0;
+  --faint: #6b7d8f;
+
+  --good: #3fb950;
+  --warn: #d29922;
+  --bad: #f85149;
+  --neutral: #58a6ff;
+  --accent: #7c8cff;
+
+  --radius: 14px;
+  --gap: 16px;
+  /* The masonry row unit. Finer = tighter packing, more spans to compute. 8px is well under
+     any real card's height granularity, so the quantisation is invisible. */
+  --row: 8px;
+
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f4f6f8;
+    --bg-elev: #eef1f5;
+    --card: #ffffff;
+    --card-hover: #fbfcfd;
+    --border: #dde3ea;
+    --text: #10171f;
+    --muted: #5b6b7c;
+    --faint: #8194a6;
+
+    --good: #1a7f37;
+    --warn: #9a6700;
+    --bad: #cf222e;
+    --neutral: #0969da;
+    --accent: #4b52d8;
+
+    color-scheme: light;
+  }
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  /*
+   * System fonts only. Not a compromise: the CSP has no remote origins, and the system stack is
+   * also the only one on a Windows shop PC guaranteed to have Devanagari — a webfont that ships
+   * Latin glyphs only turns every Hindi string into tofu boxes.
+   */
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-y: auto;
+}
+
+.boot {
+  display: grid;
+  place-items: center;
+  height: 100vh;
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------- sync strip */
+
+/*
+ * ALWAYS VISIBLE, never behind a menu.
+ *
+ * The owner must be able to tell at a glance whether the numbers are current. A dashboard
+ * silently showing week-old figures is worse than one that admits it is broken, and this strip
+ * plus the `.stale` treatment below is the whole of that promise.
+ */
+.statusbar,
+.sync-strip {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+.dot.ok { background: var(--good); }
+.dot.waiting { background: var(--warn); }
+.dot.error { background: var(--bad); }
+.dot.never { background: var(--muted); }
+
+/* A slow, quiet pulse while Tally is closed. Never on the error state: a red dot that throbs
+   reads as an emergency, and Tally being shut on a Sunday is not one. */
+.dot.waiting {
+  animation: pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% { opacity: 0.35; }
+}
+
+.status-text {
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.as-of {
+  color: var(--faint);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.as-of::before {
+  content: "·";
+  margin-right: 8px;
+}
+
+.status-action {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.status-action:hover { background: var(--card-hover); }
+.status-action:disabled { opacity: 0.6; cursor: default; }
+.status-action.primary { margin-left: auto; }
+
+/* A visible focus ring on everything. This app is used by people who never touch a trackpad. */
+.status-action:focus-visible,
+.lang-option:focus-visible,
+.company:focus-visible,
+.link-button:focus-visible,
+.tree-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* ---------------------------------------------------------------- language */
+
+.lang {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  flex: none;
+  margin-left: auto;
+}
+/* When both are present the sync button takes the right edge and the toggle sits beside it. */
+.lang + .status-action.primary { margin-left: 0; }
+
+.lang-option {
+  padding: 5px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.lang-option:hover { background: var(--card-hover); }
+.lang-option.on { background: var(--card); color: var(--text); font-weight: 600; }
+
+/* ---------------------------------------------------------------- banners */
+
+.banners { display: flex; flex-direction: column; }
+
+.banner {
+  padding: 10px 20px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+.banner.warn {
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+  color: color-mix(in srgb, var(--warn) 70%, var(--text));
+}
+.banner.bad {
+  background: color-mix(in srgb, var(--bad) 14%, transparent);
+  color: color-mix(in srgb, var(--bad) 70%, var(--text));
+}
+
+/* ---------------------------------------------------------------- companies */
+
+.companies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 16px 20px 0;
+}
+
+.company {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.company.on {
+  background: var(--card);
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--border));
+}
+
+/* ---------------------------------------------------------------- grid */
+
+/*
+ * THE GRID, AND WHY IT IS ROW-SPANNED RATHER THAN JUST `align-items: start`.
+ *
+ * A CSS grid row is as tall as its tallest item. The Receivables card is a donut plus five
+ * debtors (~500px); Cash and Profit are ~230px. They share row 1, so `align-items: start`
+ * parked the short cards at the top of a 500px row and left ~270px of VOID under each. On the
+ * 1366×768 screen this product is actually used on, roughly 40% of the first screen was empty
+ * and Payables was pushed below the fold. That was invisible to every test — the fake DOM has
+ * no layout — and obvious in the first screenshot ever taken (scripts/visual-harness.mjs).
+ *
+ * The fix is the standard masonry-in-grid technique: make the rows FINE (`--row: 8px`) and let
+ * `layoutMasonry` in dashboard.ts give each card a `grid-row-end: span N` computed from the
+ * height it actually wants. Cards then pack against each other instead of against the tallest
+ * card in their row, and reading order is preserved — which rules out `columns:`, the other
+ * masonry option, because it flows top-to-bottom-then-across and would put Cash, Profit and
+ * Receivables in one column instead of across the top where the eye lands.
+ *
+ * `row-gap: 0` is deliberate and load-bearing: the gap between cards comes from the span maths
+ * (`--row` + `--gap`) instead, because a row gap applied to 8px rows would multiply into the
+ * space between every card. The column gap is unaffected.
+ *
+ * IF THE JS NEVER RUNS, this degrades to one row per card rather than to garbage — see the
+ * fallback in `.grid > *` below.
+ */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-auto-rows: var(--row);
+  column-gap: var(--gap);
+  row-gap: 0;
+  padding: 20px;
+  align-items: start;
+  /*
+   * `dense` BACKFILLS THE HOLE A `.wide` CARD LEAVES, and at 1024×768 that hole was a third of
+   * the screen.
+   *
+   * At 1024px the grid resolves to THREE columns. Cash takes column 1, Profit column 2, and
+   * Receivables — `span 2` — no longer fits in the single remaining column, so it wraps to the
+   * next row. Column 3 is then stranded for the whole of row 1, and the default sparse algorithm
+   * never looks backwards to fill it. The result was a dead vertical strip down the right of a
+   * very common shop-laptop resolution, which the 1366px screenshot could not show because four
+   * columns happen to divide evenly.
+   *
+   * `dense` lets a LATER one-column card (Stock) move up into that gap. The cost is honest: it
+   * decouples visual order from DOM order, so a card can appear earlier than it was painted.
+   * That is acceptable HERE and would not be everywhere — the cards are peers answering separate
+   * questions, not a ranked list, and `paintContent`'s ordering is about what the eye meets
+   * first, which an empty third of the screen defeats far more thoroughly than a reflow does.
+   *
+   * Accessibility note, and the reason this is safe: DOM order is what a screen reader and the
+   * tab sequence follow, and `dense` does not touch it. Only the visual packing changes.
+   */
+  grid-auto-flow: row dense;
+}
+
+/*
+ * The no-JS fallback. Until `layoutMasonry` sets a real span, a card would be ONE 8px row tall
+ * and every card would overlap in a heap. `span 40` (~320px) is a plausible card, so a broken
+ * or slow layout pass reads as slightly-wrong spacing rather than an unreadable pile.
+ */
+.grid > * {
+  grid-row-end: span 40;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  /* Tall cards (debtor lists) must not stretch their row-mates. */
+  align-self: start;
+  animation: rise 260ms ease-out both;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+}
+
+.card.wide { grid-column: span 2; }
+.card.full { grid-column: 1 / -1; }
+
+@media (max-width: 760px) {
+  .card.wide { grid-column: span 1; }
+}
+
+/*
+ * THE STALE TREATMENT.
+ *
+ * When the last sync did not succeed, the numbers on screen are from an earlier one. The banner
+ * says so in a sentence; this makes it impossible to glance past. Deliberately restrained —
+ * still perfectly readable, because these ARE the owner's real numbers as of some earlier point
+ * and hiding them would be its own kind of lie.
+ */
+.grid.stale .card {
+  filter: saturate(0.55);
+  opacity: 0.88;
+}
+
+.card-title {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Uppercasing is a Latin habit. Devanagari has no case, and `text-transform` on it is a no-op
+   at best; the letter-spacing, however, breaks its conjuncts apart. Turn both off. */
+:root[lang="hi"] .card-title,
+:root[lang="hi"] .card-subtitle {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+}
+
+.card-subtitle {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+/*
+ * The headline number.
+ *
+ * tabular-nums is not cosmetic: without it digits have different widths and the number visibly
+ * jitters every time a sync lands, which reads as instability in a number the owner is deciding
+ * on.
+ */
+.big {
+  font-size: 34px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+.big.good { color: var(--good); }
+.big.bad { color: var(--bad); }
+.big.warn { color: var(--warn); }
+.big.neutral { color: var(--text); }
+
+.sub { color: var(--muted); font-size: 13px; }
+.sub.is-overdue { color: var(--warn); }
+
+.card-empty {
+  color: var(--faint);
+  font-size: 13px;
+  padding: 6px 0;
+}
+
+.card-error {
+  color: var(--bad);
+  font-size: 13px;
+  padding: 6px 0;
+}
+
+.delta { font-weight: 600; }
+.delta.up { color: var(--good); }
+.delta.down { color: var(--bad); }
+.delta.flat { color: var(--muted); }
+.delta-vs { color: var(--muted); }
+
+/* ---------------------------------------------------------------- rows */
+
+.rows { display: flex; flex-direction: column; gap: 8px; }
+
+.row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.row-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* A 60-character party name must truncate, never wrap the row into two lines and never push
+     the amount off the card. The amount is the point of the row. */
+  min-width: 0;
+}
+
+.row-name.others { color: var(--muted); font-style: italic; }
+
+.row-value { font-weight: 600; white-space: nowrap; }
+
+.link-button {
+  align-self: flex-start;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--neutral);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.link-button:hover { text-decoration: underline; }
+
+.chip {
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  opacity: 0.85;
+  white-space: nowrap;
+  flex: none;
+}
+.chip.good { color: var(--good); }
+.chip.warn { color: var(--warn); }
+.chip.bad { color: var(--bad); }
+.chip.neutral { color: var(--muted); }
+
+.tone-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: none;
+}
+.tone-dot.good { background: var(--good); }
+.tone-dot.warn { background: var(--warn); }
+.tone-dot.bad { background: var(--bad); }
+.tone-dot.neutral { background: var(--neutral); }
+
+.swatch {
+  width: 6px;
+  height: 14px;
+  border-radius: 2px;
+  flex: none;
+  align-self: center;
+}
+.swatch.cash { background: var(--good); }
+.swatch.bank { background: var(--neutral); }
+
+/* ---------------------------------------------------------------- cash composition */
+
+.stack {
+  display: flex;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--border);
+  gap: 2px;
+}
+
+.stack-seg {
+  width: var(--w);
+  min-width: 2px;
+  transition: width 300ms ease-out;
+}
+.stack-seg.cash { background: var(--good); }
+.stack-seg.bank { background: var(--neutral); }
+/* Alternate the bank segments so eight accounts are eight bands, not one blue bar. */
+.stack-seg.bank:nth-child(even) { background: color-mix(in srgb, var(--neutral) 62%, var(--card)); }
+
+/* ---------------------------------------------------------------- bars */
+
+/*
+ * The ageing bars.
+ *
+ * They sit beside the donut rather than instead of it, and that is not indecision: the ring
+ * answers "what proportion of what I am owed has gone bad" and the bars answer "how much, and
+ * how late". The owner asks both in one glance, and bars win magnitude comparisons that rings
+ * lose.
+ */
+.bars { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+
+.bar-row {
+  display: grid;
+  grid-template-columns: 8px 84px 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.bar-label {
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar-track {
+  height: 8px;
+  background: color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  width: var(--w);
+  border-radius: 999px;
+  transition: width 300ms ease-out;
+}
+.bar-fill.good { background: var(--good); }
+.bar-fill.warn { background: var(--warn); }
+.bar-fill.bad { background: var(--bad); }
+.bar-fill.neutral { background: var(--neutral); }
+
+.bar-value { font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ---------------------------------------------------------------- donut */
+
+.ageing-body {
+  display: grid;
+  grid-template-columns: 132px 1fr;
+  gap: 18px;
+  align-items: center;
+  padding: 4px 0;
+}
+
+@media (max-width: 520px) {
+  .ageing-body { grid-template-columns: 1fr; }
+  .donut-wrap { justify-self: center; }
+}
+
+.donut-wrap {
+  position: relative;
+  width: 132px;
+  height: 132px;
+}
+
+.donut {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.donut-track {
+  fill: none;
+  stroke: color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.donut-slice {
+  fill: none;
+  stroke-linecap: butt;
+  /* The ring draws itself once, in a third of a second. The slices are already in place; only
+     the dash offset moves, so nothing about the picture is ever momentarily wrong. */
+  animation: sweep 340ms ease-out both;
+  transform-origin: 50% 50%;
+}
+.donut-slice.good { stroke: var(--good); }
+.donut-slice.warn { stroke: var(--warn); }
+.donut-slice.bad { stroke: var(--bad); }
+.donut-slice.neutral { stroke: var(--neutral); }
+
+@keyframes sweep {
+  from { opacity: 0; transform: rotate(-12deg) scale(0.94); }
+}
+
+.donut-center {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  pointer-events: none;
+}
+
+.donut-center-top {
+  font-size: 19px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.donut-center-bottom {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+:root[lang="hi"] .donut-center-bottom { text-transform: none; letter-spacing: 0; }
+
+/* ---------------------------------------------------------------- columns */
+
+.columns {
+  width: 100%;
+  height: auto;
+  display: block;
+  margin-top: 4px;
+  overflow: visible;
+}
+
+.column {
+  fill: var(--neutral);
+  opacity: 0.5;
+  transition: opacity 160ms ease-out;
+}
+.column.accent { fill: var(--accent); opacity: 1; }
+.column.negative { fill: var(--bad); opacity: 0.75; }
+.columns:hover .column { opacity: 0.8; }
+.columns:hover .column.accent { opacity: 1; }
+
+.column-label {
+  fill: var(--faint);
+  font-size: 9px;
+  font-family: inherit;
+}
+.column-label.accent { fill: var(--text); font-weight: 600; }
+
+.zero-line {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+/* ---------------------------------------------------------------- balance sheet */
+
+/*
+ * THE TWO SIDES OF THE BALANCE SHEET.
+ *
+ * Side by side on a real screen, stacked on a narrow one. This is the shape Tally's own Balance
+ * Sheet has — liabilities and assets facing each other — and it is the shape an Indian SMB owner
+ * has been reading for twenty years. `minmax(0, 1fr)` rather than `1fr`: a grid track's default
+ * `min-width: auto` refuses to shrink below its content, so a long group name would push the
+ * other side off the card instead of ellipsing.
+ */
+.sheet-sides {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  gap: 20px;
+}
+
+.sheet-side { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+
+.sheet-side-title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* The nil-balance line: present, named, and visibly not part of either side — because the sign
+   genuinely does not say which side it belongs on, and inventing one would be a lie about a
+   group holding no money. */
+.sheet-nil {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.tree { display: flex; flex-direction: column; }
+
+.tree-row { padding-left: calc(var(--depth) * 18px); }
+
+.tree-toggle,
+.tree-row > .caret {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.tree-toggle:hover { background: var(--card-hover); }
+
+.tree-row > .caret.leaf {
+  display: inline-flex;
+  cursor: default;
+}
+/* A leaf's own row is a plain div, so lay it out like the button it is standing in for. */
+.tree-row:has(> .caret.leaf) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  padding-left: calc(var(--depth) * 18px + 6px);
+}
+
+.caret {
+  width: 12px;
+  flex: none;
+  color: var(--faint);
+  font-size: 10px;
+}
+
+.tree-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+}
+/* Dr and Cr, not good and bad: a balance sheet has no opinion about which side you are on. */
+.tree-value.dr { color: var(--neutral); }
+.tree-value.cr { color: var(--muted); }
+
+.tree-children { display: none; }
+.tree-children.open { display: block; }
+
+/* ---------------------------------------------------------------- empty */
+
+.empty {
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  padding: 72px 24px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.empty-text { max-width: 46ch; }
+
+/* ---------------------------------------------------------------- skeleton */
+
+.skeleton { gap: 12px; }
+
+.sk {
+  background: color-mix(in srgb, var(--border) 60%, transparent);
+  border-radius: 6px;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+.sk-title { height: 10px; width: 40%; }
+.sk-big { height: 30px; width: 62%; }
+.sk-line { height: 9px; width: 100%; }
+
+@keyframes shimmer {
+  50% { opacity: 0.45; }
+}
+
+/* ---------------------------------------------------------------- motion */
+
+/*
+ * Every animation above is decoration over content that is already correct and already in place
+ * — nothing here reveals information by moving. So switching all of it off costs nothing, which
+ * is the property that makes this honest rather than a gesture.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

@@ -1,0 +1,18 @@
+{
+  // Typechecks the TESTS.
+  //
+  // The main tsconfig has `include: ["src/**/*"]` because it EMITS, and emitting tests into
+  // dist would ship them. But that means `tsc -p tsconfig.json` never looks at a test file —
+  // and `node --test --experimental-strip-types` only STRIPS types, it does not check them.
+  // Without this config, test files are checked by NOTHING, and type errors in them are
+  // invisible to every command in package.json. (Verified: a planted `const x: number =
+  // "string"` in a test passed the whole toolchain.)
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    // The main config pins rootDir to src/ for emit layout. Tests live outside it, and this
+    // config emits nothing, so widen it rather than fight it.
+    "rootDir": "."
+  },
+  "include": ["src/**/*", "test/**/*"]
+}
