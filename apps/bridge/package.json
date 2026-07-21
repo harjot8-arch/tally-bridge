@@ -10,6 +10,8 @@
     "dev:rebuild-native": "node scripts/rebuild-native-for-electron.mjs",
     "dev:restore-native": "node scripts/rebuild-native-for-electron.mjs --to-node",
     "build": "node scripts/clean.mjs && tsc -p tsconfig.json && node scripts/build-assets.mjs",
+    "dist": "npm run build && electron-builder --publish never",
+    "dist:win": "npm run build && electron-builder --win --publish never",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
     "test": "node --test --experimental-strip-types test/*.test.ts",
     "visual": "npm run build && electron scripts/visual-harness.mjs",
@@ -31,6 +33,33 @@
     "@types/node": "^22.10.2",
     "@types/qrcode": "^1.5.6",
     "electron": "^43.1.1",
+    "electron-builder": "^25.1.8",
     "typescript": "^5.7.2"
+  },
+  "build": {
+    "appId": "com.tallybridge.desktop",
+    "productName": "Tally Bridge",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json",
+      "!**/*.map",
+      "!**/*.d.ts"
+    ],
+    "asarUnpack": [
+      "**/*.node"
+    ],
+    "npmRebuild": true,
+    "win": {
+      "target": "nsis",
+      "artifactName": "Tally-Bridge-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    }
   }
 }
