@@ -1,7 +1,8 @@
 import { renderEmpty } from './cards.ts';
-import { clear, mount } from './dom.ts';
+import { button, clear, el, mount } from './dom.ts';
 import { mountDashboard, type DashboardHandle } from './dashboard.ts';
 import { decideContent, startWizard } from './wizard.ts';
+import { isLocale, translator, type Locale } from './i18n.ts';
 
 /**
  * The renderer entry point.
@@ -151,16 +152,92 @@ function showWizard(host: HTMLElement): void {
 function showDashboard(host: HTMLElement): void {
   if (dashboard) return;
   clear(host);
-  // `onUnlockRequested` is OMITTED, not passed as undefined — with exactOptionalPropertyTypes
-  // those are different types, and the distinction is the right one here: omitting means "this
-  // shell offers no unlock prompt", which is the truth.
-  //
-  // The passphrase prompt belongs to the shell rather than the dashboard — it is the same prompt
-  // onboarding owns, and two implementations of a passphrase field is one too many. Until that
-  // prompt is lifted out of the wizard, the locked card states what is true and offers no
-  // button. That is honest; a button that did nothing would not be.
-  dashboard = mountDashboard(host, {});
+  // The locked dashboard offers an Unlock button, and clicking it opens the passphrase prompt
+  // below. Without this the owner reaches "enter your passphrase to see your figures" with no
+  // field to type in — a dead end after setup, which is exactly where a real owner got stuck.
+  dashboard = mountDashboard(host, { onUnlockRequested: () => promptUnlock(host) });
   void dashboard.refresh();
+}
+
+/** The current UI locale, read the same way `mountDashboard` reads it. */
+function currentLocale(): Locale {
+  try {
+    const v = window.localStorage.getItem('tally-bridge.locale');
+    return isLocale(v) ? v : 'en';
+  } catch {
+    return 'en';
+  }
+}
+
+/**
+ * The passphrase prompt: derive the key from the owner's passphrase and unlock the local
+ * figures. The heavy lifting (Argon2id, the wrapped-blob unwrap, the roster) is the main
+ * process's `unlock` IPC — this only collects the passphrase and reports success or a retry.
+ *
+ * The passphrase never leaves this function except through `window.bridge.unlock`, is masked in
+ * the field, is scrubbed from the field after each attempt, and is never logged.
+ */
+function promptUnlock(host: HTMLElement): void {
+  if (host.querySelector('.unlock-overlay')) return; // never stack two prompts
+  const t = translator(currentLocale());
+
+  const overlay = el('div', 'unlock-overlay');
+  const card = el('div', 'unlock-card');
+  const input = el('input', 'unlock-input');
+  input.type = 'password';
+  input.autocomplete = 'off';
+  input.setAttribute('aria-label', t('unlock.title'));
+  input.placeholder = t('unlock.placeholder');
+  const error = el('p', 'unlock-error');
+  const actions = el('div', 'unlock-actions');
+
+  const close = () => {
+    input.value = ''; // scrub
+    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+  };
+
+  const submit = button('status-action primary', t('locked.action'), () => void attempt());
+  const cancel = button('status-action', t('unlock.cancel'), close);
+
+  async function attempt(): Promise<void> {
+    const passphrase = input.value;
+    if (!passphrase) {
+      input.focus();
+      return;
+    }
+    submit.disabled = true;
+    cancel.disabled = true;
+    error.textContent = '';
+    submit.textContent = t('unlock.working');
+    let ok = false;
+    try {
+      ok = await window.bridge.unlock(passphrase);
+    } catch {
+      ok = false;
+    }
+    input.value = ''; // scrub whatever the result
+    submit.textContent = t('locked.action');
+    submit.disabled = false;
+    cancel.disabled = false;
+    if (ok) {
+      close();
+      void dashboard?.refresh(); // now unlocked -> the cards render
+    } else {
+      error.textContent = t('unlock.wrong');
+      input.focus();
+    }
+  }
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') void attempt();
+    if (e.key === 'Escape') close();
+  });
+
+  mount(actions, cancel, submit);
+  mount(card, el('h2', 'unlock-title', t('unlock.title')), el('p', 'unlock-sub', t('unlock.sub')), input, error, actions);
+  mount(overlay, card);
+  mount(host, overlay);
+  input.focus();
 }
 
 function boot(): void {

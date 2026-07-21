@@ -131,6 +131,8 @@ function fakeUpload() {
     if (url.includes('/v2/user')) return json({ user: { username: 'u' } });
     if (url.includes('/v1/integrations/configurations')) return json([{ id: 'icfg_1', slug: 'neon' }]);
     if (url.includes('/v11/projects')) return json({ id: 'prj_1', name: 'p' });
+    // PATCH /v9/projects/{id}: disable deployment protection.
+    if (url.includes('/v9/projects/') && method === 'PATCH') return json({ id: 'prj_1' });
     if (url.includes('/v1/storage/stores/integration/direct')) return json({ store: { id: 'st_1' } });
     if (url.includes('/v1/storage/stores/st_1')) return json({ store: { status: 'available' } });
     if (url.includes('/connections')) return json({});

@@ -127,6 +127,12 @@ const en = {
 
   'locked.body': 'Your data is locked. Enter your passphrase to see your figures.',
   'locked.action': 'Unlock',
+  'unlock.title': 'Enter your passphrase',
+  'unlock.sub': 'This unlocks your figures on this computer. It takes a few seconds.',
+  'unlock.placeholder': 'Passphrase',
+  'unlock.working': 'Unlocking…',
+  'unlock.wrong': 'That passphrase did not work. Please try again.',
+  'unlock.cancel': 'Cancel',
 
   'empty.all': 'No data yet. Once Tally has been open for one sync, your numbers appear here.',
 } satisfies Record<string, string>;
@@ -220,6 +226,12 @@ const hi: Partial<Record<StringKey, string>> = {
 
   'locked.body': 'आपका डेटा लॉक है। आँकड़े देखने के लिए अपना पासफ़्रेज़ डालें।',
   'locked.action': 'अनलॉक करें',
+  'unlock.title': 'अपना पासफ़्रेज़ डालें',
+  'unlock.sub': 'यह इस कंप्यूटर पर आपके आँकड़े खोलता है। इसमें कुछ सेकंड लगते हैं।',
+  'unlock.placeholder': 'पासफ़्रेज़',
+  'unlock.working': 'खोल रहे हैं…',
+  'unlock.wrong': 'यह पासफ़्रेज़ काम नहीं आया। कृपया फिर से आज़माएँ।',
+  'unlock.cancel': 'रद्द करें',
 
   'empty.all': 'अभी कोई डेटा नहीं। Tally के एक बार खुलने और सिंक होते ही आपके आँकड़े यहाँ दिखेंगे।',
 };
