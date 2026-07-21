@@ -124,11 +124,27 @@ have you send something you regret.
 
 ## Part 4 — Run the actual app
 
+The desktop app is built from `apps\bridge`, **not** the repo root — the root `npm run build`
+only compiles the shared libraries. Run these from `apps\bridge`:
+
 ```powershell
-npm run build
 cd apps\bridge
+npm run build
+npm run dev:rebuild-native -- --yes
 npm start
 ```
+
+- `npm run build` produces `dist\main\index.js`, the entry Electron launches. Without it you get
+  *"cannot find module … valid main entry"*.
+- `npm run dev:rebuild-native -- --yes` recompiles the SQLite engine for Electron (it ships built
+  for plain Node). Skipping it launches the app but crashes the moment it opens its database.
+
+> **This breaks `npm test`.** The tests need the Node build of SQLite; the app needs the Electron
+> build, and only one can exist at a time. Before you run the test suite again:
+> ```powershell
+> npm run dev:restore-native -- --yes
+> ```
+> This is a deliberate trade-off in Electron apps with native modules, not a fault.
 
 The setup wizard opens. Walk through it as a **complete beginner would** — that is the point of
 this pass. Do not use your knowledge of how it works to get past a confusing screen; if you are
