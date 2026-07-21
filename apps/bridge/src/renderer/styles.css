@@ -20,47 +20,68 @@
  * read for the second it is wrong.
  */
 
+/*
+ * ROYAL MINIMALIST TECH — obsidian ground, frosted-glass cards, a champagne-gold accent
+ * used with restraint. The palette is TOKENS ONLY; every component reads through them, so the
+ * light "pristine white" world below is a token swap, not a second stylesheet. Semantic tones
+ * (good/warn/bad) are deliberately NOT the accent — the accent is chrome, the tones are meaning.
+ */
 :root {
-  --bg: #0b0f14;
-  --bg-elev: #0e141b;
-  --card: #131a23;
-  --card-hover: #18212c;
-  --border: #22303f;
-  --text: #e6edf3;
-  --muted: #9fb0c0;
-  --faint: #6b7d8f;
+  --bg: #070a0f;            /* obsidian, faint blue bias */
+  --bg-elev: #0b0f16;
+  /* Cards are GLASS: translucent white over the obsidian ground + backdrop-blur. `--card-solid`
+     is the one opaque surface (the unlock modal, which sits over a scrim and must not show it). */
+  --card: rgba(255, 255, 255, 0.045);
+  --card-hover: rgba(255, 255, 255, 0.08);
+  --card-solid: #0e141d;
+  /* Metallic hairline: a cool near-white at low alpha reads as brushed edge, not a drawn line. */
+  --border: rgba(210, 225, 255, 0.12);
+  --border-strong: rgba(210, 225, 255, 0.22);
+  --text: #eaf0f7;
+  --muted: #8a98ac;
+  --faint: #5a6678;
 
-  --good: #3fb950;
-  --warn: #d29922;
-  --bad: #f85149;
-  --neutral: #58a6ff;
-  --accent: #7c8cff;
+  --good: #46d9a0;
+  --warn: #f5c24b;
+  --bad: #fb6b6b;
+  --neutral: #6aa6ff;
+  --accent: #c9a96a;        /* champagne — the "royal". Focus rings, primary CTA, the live column. */
+  --accent-2: #e7d3a1;
 
-  --radius: 14px;
+  --radius: 16px;
   --gap: 16px;
   /* The masonry row unit. Finer = tighter packing, more spans to compute. 8px is well under
      any real card's height granularity, so the quantisation is invisible. */
   --row: 8px;
+
+  --glow-gold: 0 0 0 1px rgba(201, 169, 106, 0.22), 0 18px 50px -24px rgba(201, 169, 106, 0.4);
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 22px 55px -34px rgba(0, 0, 0, 0.9);
 
   color-scheme: dark;
 }
 
 @media (prefers-color-scheme: light) {
   :root {
-    --bg: #f4f6f8;
-    --bg-elev: #eef1f5;
-    --card: #ffffff;
-    --card-hover: #fbfcfd;
-    --border: #dde3ea;
-    --text: #10171f;
-    --muted: #5b6b7c;
-    --faint: #8194a6;
+    --bg: #edf1f6;
+    --bg-elev: #f6f8fb;
+    --card: rgba(255, 255, 255, 0.72);
+    --card-hover: rgba(255, 255, 255, 0.95);
+    --card-solid: #ffffff;
+    --border: rgba(20, 35, 70, 0.12);
+    --border-strong: rgba(20, 35, 70, 0.22);
+    --text: #0c1220;
+    --muted: #5a6884;
+    --faint: #8a96ac;
 
-    --good: #1a7f37;
-    --warn: #9a6700;
-    --bad: #cf222e;
-    --neutral: #0969da;
-    --accent: #4b52d8;
+    --good: #12946a;
+    --warn: #b6820c;
+    --bad: #d2413f;
+    --neutral: #2c6fd6;
+    --accent: #9a7b34;
+    --accent-2: #b8923f;
+
+    --glow-gold: 0 0 0 1px rgba(154, 123, 52, 0.22), 0 18px 50px -26px rgba(154, 123, 52, 0.35);
+    --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 22px 48px -34px rgba(30, 45, 90, 0.35);
 
     color-scheme: light;
   }
@@ -83,6 +104,31 @@ body {
   font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow-y: auto;
+}
+
+/*
+ * Ambient light — two soft pools that give the obsidian ground depth and let the frosted cards
+ * read as glass sitting ABOVE something. Pure CSS, fixed, non-interactive, and cheap: a couple of
+ * radial gradients, no blur, no repaint. The whole "spatial 3D" impression is this plus the
+ * per-card backdrop-blur and metallic edge — no WebGL, no images, nothing the CSP forbids.
+ */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(1100px 680px at 82% -12%, rgba(201, 169, 106, 0.10), transparent 60%),
+    radial-gradient(900px 760px at -6% 10%, rgba(106, 166, 255, 0.08), transparent 55%),
+    radial-gradient(1200px 900px at 50% 118%, rgba(70, 217, 160, 0.05), transparent 60%);
+}
+@media (prefers-color-scheme: light) {
+  body::before {
+    background:
+      radial-gradient(1000px 620px at 82% -14%, rgba(184, 146, 63, 0.14), transparent 60%),
+      radial-gradient(880px 720px at -6% 8%, rgba(44, 111, 214, 0.09), transparent 55%);
+  }
 }
 
 .boot {
@@ -108,10 +154,15 @@ body {
   z-index: 10;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px 20px;
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
-  backdrop-filter: blur(8px);
+  gap: 12px;
+  padding: 15px 24px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--bg) 82%, transparent),
+    color-mix(in srgb, var(--bg) 42%, transparent)
+  );
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
   border-bottom: 1px solid var(--border);
 }
 
@@ -154,18 +205,39 @@ body {
 }
 
 .status-action {
-  padding: 6px 14px;
-  border-radius: 8px;
+  padding: 8px 16px;
+  border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--card);
   color: var(--text);
   font: inherit;
+  font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: transform 180ms cubic-bezier(0.22, 0.61, 0.36, 1), border-color 180ms, background 180ms;
 }
-.status-action:hover { background: var(--card-hover); }
-.status-action:disabled { opacity: 0.6; cursor: default; }
+.status-action:hover { background: var(--card-hover); border-color: var(--border-strong); transform: translateY(-1px); }
+.status-action:disabled { opacity: 0.6; cursor: default; transform: none; }
 .status-action.primary { margin-left: auto; }
+
+/*
+ * The one gold moment. The primary action (Sync now / Open Tally) is the single champagne fill on
+ * the screen; everything else stays quiet glass so this reads as THE thing to press. Dark ink on
+ * gold, not white, for contrast on both themes.
+ */
+.status-action.primary {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--accent-2), var(--accent));
+  color: #12100b;
+  font-weight: 650;
+  box-shadow: 0 6px 18px -8px rgba(201, 169, 106, 0.7);
+}
+.status-action.primary:hover {
+  background: linear-gradient(180deg, var(--accent-2), var(--accent));
+  filter: brightness(1.06);
+}
 
 /* A visible focus ring on everything. This app is used by people who never touch a trackpad. */
 .status-action:focus-visible,
@@ -317,20 +389,52 @@ body {
 }
 
 .card {
-  background: var(--card);
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 46%),
+    var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 18px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  /* Tall cards (debtor lists) must not stretch their row-mates. */
+  /*
+   * Tall cards (debtor lists) must not stretch their row-mates — AND this is load-bearing for the
+   * masonry ResizeObserver: `align-self: start` decouples a card's height from its row span, so
+   * writing `grid-row-end` never resizes the observed box and there is no relayout loop. See
+   * dashboard.ts `relayout`. Do not remove it for the sake of a stretch effect.
+   */
   align-self: start;
-  animation: rise 260ms ease-out both;
+  backdrop-filter: blur(14px) saturate(130%);
+  -webkit-backdrop-filter: blur(14px) saturate(130%);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  transition: transform 400ms cubic-bezier(0.22, 0.61, 0.36, 1), border-color 400ms, box-shadow 400ms;
+  animation: rise 320ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* Brushed-metal top edge: a 1px highlight that catches the ambient light like a bevel. */
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-strong), transparent);
+}
+
+/*
+ * The lift. `transform` is safe under the masonry observer — it does not change the content-box
+ * size ResizeObserver watches, so no span recompute is triggered on hover.
+ */
+.card:hover {
+  transform: translateY(-3px);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-card), var(--glow-gold);
 }
 
 @keyframes rise {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(8px); }
 }
 
 .card.wide { grid-column: span 2; }
@@ -389,11 +493,12 @@ body {
  * on.
  */
 .big {
-  font-size: 34px;
-  font-weight: 650;
-  letter-spacing: -0.02em;
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
   font-variant-numeric: tabular-nums;
-  line-height: 1.15;
+  font-feature-settings: "tnum" 1;
+  line-height: 1.1;
 }
 
 .big.good { color: var(--good); }
@@ -825,14 +930,24 @@ body {
   padding: 20px;
 }
 .unlock-card {
-  background: var(--card);
-  border: 1px solid var(--border);
+  position: relative;
+  background: var(--card-solid);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   padding: 28px;
   width: min(92vw, 380px);
   display: flex;
   flex-direction: column;
   gap: 14px;
+  box-shadow: var(--shadow-card), var(--glow-gold);
+}
+.unlock-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
 }
 .unlock-title { margin: 0; font-size: 18px; color: var(--text); }
 .unlock-sub { margin: 0; font-size: 13px; color: var(--muted); }
@@ -841,7 +956,7 @@ body {
   font-size: 16px;
   border-radius: 10px;
   border: 1px solid var(--border);
-  background: var(--card-hover);
+  background: var(--bg-elev);
   color: var(--text);
 }
 .unlock-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
