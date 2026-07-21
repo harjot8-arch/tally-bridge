@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "description": "Tally Bridge — reads a business's books out of Tally, encrypts them at the edge, and pushes them to the owner's own dashboard.",
+  "author": "Tally Bridge",
   "main": "dist/main/index.js",
   "scripts": {
     "clean": "node scripts/clean.mjs",
@@ -39,6 +41,7 @@
   "build": {
     "appId": "com.tallybridge.desktop",
     "productName": "Tally Bridge",
+    "electronVersion": "43.1.1",
     "directories": {
       "output": "release"
     },
