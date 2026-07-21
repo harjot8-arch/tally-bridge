@@ -124,8 +124,25 @@ have you send something you regret.
 
 ## Part 4 — Run the actual app
 
-The desktop app is built from `apps\bridge`, **not** the repo root — the root `npm run build`
-only compiles the shared libraries. Run these from `apps\bridge`:
+**The easy way — the installer.** You do not need Node, npm, or a compiler to *run* the app; that
+is only for the tests above. Download the installer and double-click it:
+
+**→ https://github.com/harjot8-arch/tally-bridge/releases/latest**
+
+Grab `Tally-Bridge-Setup-<version>.exe`, run it, click through. Windows SmartScreen will warn
+("Windows protected your PC" / "unknown publisher") because the installer is **not code-signed
+yet** — click **More info → Run anyway**. That warning goes away once an OV code-signing
+certificate is purchased; it is expected for now, not a virus.
+
+> The installer is built automatically on GitHub's Windows machines, which compile the database
+> engine correctly for Electron — so the `NODE_MODULE_VERSION` error you cannot fix without a
+> compiler simply never happens with the packaged app.
+
+**The developer way (optional).** If you specifically want to run from source, the app is built
+from `apps\bridge` and its SQLite engine must be recompiled for Electron — which **needs the C++
+build tools** (`winget install Microsoft.VisualStudio.2022.BuildTools --override "--add
+Microsoft.VisualStudio.Workload.VCTools"` and `winget install Python.Python.3.12`, then reopen
+PowerShell):
 
 ```powershell
 cd apps\bridge
@@ -134,19 +151,11 @@ npm run dev:rebuild-native -- --yes
 npm start
 ```
 
-- `npm run build` produces `dist\main\index.js`, the entry Electron launches. Without it you get
-  *"cannot find module … valid main entry"*.
-- `npm run dev:rebuild-native -- --yes` recompiles the SQLite engine for Electron (it ships built
-  for plain Node). Skipping it launches the app but crashes the moment it opens its database.
+> The rebuild **breaks `npm test`** (tests need the Node build of SQLite, the app needs the
+> Electron build). To run the suite again: `npm run dev:restore-native -- --yes`. Deliberate
+> trade-off, not a fault. If you have no compiler, use the installer above instead.
 
-> **This breaks `npm test`.** The tests need the Node build of SQLite; the app needs the Electron
-> build, and only one can exist at a time. Before you run the test suite again:
-> ```powershell
-> npm run dev:restore-native -- --yes
-> ```
-> This is a deliberate trade-off in Electron apps with native modules, not a fault.
-
-The setup wizard opens. Walk through it as a **complete beginner would** — that is the point of
+Once running, the setup wizard opens. Walk through it as a **complete beginner would** — that is the point of
 this pass. Do not use your knowledge of how it works to get past a confusing screen; if you are
 confused, write down where.
 
