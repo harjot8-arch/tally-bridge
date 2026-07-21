@@ -17,7 +17,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "build:deploy-bundle": "node --experimental-strip-types scripts/build-deploy-bundle.ts",
     "spike:tally": "node --experimental-strip-types scripts/spike-a-ageing.ts",
-    "prepare": "npm run build -w @tally-bridge/core && npm run build -w @tally-bridge/crypto && npm run build -w @tally-bridge/protocol -w @tally-bridge/tally -w @tally-bridge/viewmodel && npm run build -w @tally-bridge/sync"
+    "prepare": "node scripts/prepare-packages.mjs"
   },
   "license": "UNLICENSED",
   "devDependencies": {
