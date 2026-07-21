@@ -1,6 +1,6 @@
 {
   "name": "@tally-bridge/bridge",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "type": "module",
   "description": "Tally Bridge — reads a business's books out of Tally, encrypts them at the edge, and pushes them to the owner's own dashboard.",

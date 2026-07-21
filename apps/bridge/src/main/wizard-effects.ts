@@ -251,19 +251,29 @@ export function createWizardEffects(deps: WizardEffectDeps): WizardHostEffects {
         recoveryKey.fill(0);
       }
 
-      if (!registered) {
-        await registerDevice(fetchImpl, input.cloud, device);
-        registered = true;
+      const dbg = deps.debugLog ?? (() => {});
+      try {
+        if (!registered) {
+          dbg(`completeSetup: registering device at ${input.cloud.deploymentUrl}`);
+          await registerDevice(fetchImpl, input.cloud, device, dbg);
+          registered = true;
+        }
+
+        dbg('completeSetup: uploading wrapped keys');
+        await putWrappedKeys(fetchImpl, input.cloud, device, uploadBodyJson, dbg);
+
+        dbg('completeSetup: persisting keystore');
+        const ks = deps.keystore;
+        ks.setDevice(device.deviceId, device.publicKey, device.secretKey);
+        ks.setIdentityPublicKey(input.identity.publicKey);
+        ks.setTenantId(input.cloud.tenantId);
+        ks.setServerUrl(input.cloud.deploymentUrl);
+        ks.setWrappedIdentityForPassphrase(passWrapJson);
+        dbg('completeSetup: done');
+      } catch (e) {
+        dbg(`completeSetup FAILED ${String((e as Error)?.message ?? e)}`);
+        throw e;
       }
-
-      await putWrappedKeys(fetchImpl, input.cloud, device, uploadBodyJson);
-
-      const ks = deps.keystore;
-      ks.setDevice(device.deviceId, device.publicKey, device.secretKey);
-      ks.setIdentityPublicKey(input.identity.publicKey);
-      ks.setTenantId(input.cloud.tenantId);
-      ks.setServerUrl(input.cloud.deploymentUrl);
-      ks.setWrappedIdentityForPassphrase(passWrapJson);
 
       return sheet;
     },
@@ -295,6 +305,7 @@ async function registerDevice(
   fetchImpl: typeof fetch,
   cloud: CloudOutcome,
   device: { deviceId: string; publicKey: Uint8Array },
+  dbg: (line: string) => void = () => {},
 ): Promise<void> {
   let res: Response;
   try {
@@ -309,17 +320,21 @@ async function registerDevice(
         label: 'Tally PC',
       }),
     });
-  } catch {
+  } catch (e) {
+    dbg(`register NETWORK error url=${cloud.deploymentUrl}${ROUTES.register.path} err=${String(e)}`);
     throw new HumanError('We could not reach your new dashboard to finish setup. Check the internet connection and try again.');
   }
+  let bodyText = '';
   try {
-    await res.arrayBuffer();
+    bodyText = await res.text();
   } catch {
-    // Body unused; a truncated read changes nothing about the status.
+    // Body read is best-effort; the status is what decides the outcome.
   }
   if (!res.ok) {
+    dbg(`register FAILED status=${res.status} url=${cloud.deploymentUrl}${ROUTES.register.path} body=${bodyText.slice(0, 600)}`);
     throw new HumanError('Your new dashboard did not accept this computer yet. Try again in a moment.');
   }
+  dbg(`register ok status=${res.status}`);
 }
 
 /**
@@ -340,6 +355,7 @@ async function putWrappedKeys(
   cloud: CloudOutcome,
   device: { deviceId: string; secretKey: Uint8Array },
   bodyJson: string,
+  dbg: (line: string) => void = () => {},
 ): Promise<void> {
   const body = new TextEncoder().encode(bodyJson);
   const headers = await signRequest(
@@ -359,21 +375,25 @@ async function putWrappedKeys(
       headers: { ...headers, 'content-type': 'application/json' },
       body,
     });
-  } catch {
+  } catch (e) {
+    dbg(`putWrappedKeys NETWORK error url=${cloud.deploymentUrl}${ROUTES.putWrappedKey.path} err=${String(e)}`);
     throw new HumanError(
       'We could not reach your new dashboard to save its sign-in setup. Check the internet connection and try again.',
     );
   }
+  let bodyText = '';
   try {
-    await res.arrayBuffer();
+    bodyText = await res.text();
   } catch {
-    // Body unused; a truncated read changes nothing about the status.
+    // Best-effort; the status decides the outcome.
   }
   if (!res.ok) {
+    dbg(`putWrappedKeys FAILED status=${res.status} url=${cloud.deploymentUrl}${ROUTES.putWrappedKey.path} body=${bodyText.slice(0, 600)}`);
     throw new HumanError(
       'Your new dashboard could not save its sign-in setup yet. Try again in a moment.',
     );
   }
+  dbg(`putWrappedKeys ok status=${res.status}`);
 }
 
 function isoDate(ms: number): string {
