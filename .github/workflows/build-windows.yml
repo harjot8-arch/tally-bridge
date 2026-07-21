@@ -17,7 +17,10 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    # windows-2022, NOT windows-latest: the latest image ships Visual Studio 18 (a 2026 preview)
+    # that node-gyp cannot yet identify ("unknown version undefined"), so the native compile
+    # fails to find a compiler. windows-2022's Visual Studio 2022 is recognised by every node-gyp.
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
 
@@ -25,6 +28,11 @@ jobs:
         with:
           node-version: 22
           cache: npm
+
+      # The bundled node-gyp (9.4.1) predates recent Visual Studio releases; the current one
+      # detects the toolchain reliably.
+      - name: Use the latest node-gyp
+        run: npm install --global node-gyp@latest
 
       # Installs every workspace and runs the root `prepare`, which builds the shared packages.
       - name: Install
