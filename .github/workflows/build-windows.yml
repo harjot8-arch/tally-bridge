@@ -15,6 +15,11 @@ on:
     tags:
       - 'v*'
 
+# The release step (softprops/action-gh-release) needs to write a Release; the default token is
+# read-only unless this is granted. Without it, a tag build packages fine but fails to publish.
+permissions:
+  contents: write
+
 jobs:
   build:
     # windows-2022, NOT windows-latest: the latest image ships Visual Studio 18 (a 2026 preview)
