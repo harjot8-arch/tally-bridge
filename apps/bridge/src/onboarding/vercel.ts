@@ -85,6 +85,17 @@ export class VercelError extends Error {
 
 const API = 'https://api.vercel.com';
 
+/**
+ * The Neon region the dashboard database is created in.
+ *
+ * Vercel's Neon integration requires this on `provision_database`. Singapore (`aws-ap-southeast-1`)
+ * is the closest first-class Neon region to India and is available on Neon's free tier. The data
+ * is small and encrypted, so region is a latency choice, not a correctness one — if a future
+ * Vercel/Neon build rejects it, the setup log names the region error and this is the one line to
+ * change.
+ */
+export const NEON_REGION = 'aws-ap-southeast-1';
+
 export interface DeployFile {
   /** Path inside the deployment, e.g. `.next/routes-manifest.json`. */
   file: string;
@@ -286,6 +297,10 @@ export class VercelClient {
         name,
         integrationConfigurationId: icfg,
         integrationProductIdOrSlug: 'neon',
+        // Vercel added a required `metadata.region` to this endpoint after this was first
+        // written (confirmed by a live 400: "metadata should have required property 'region'").
+        // Singapore is the closest first-class Neon region to India and is on the free tier.
+        metadata: { region: NEON_REGION },
       },
     );
     const id = r.store?.id;

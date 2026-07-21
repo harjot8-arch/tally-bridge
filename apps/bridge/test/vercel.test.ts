@@ -5,6 +5,7 @@ import {
   VercelError,
   provision,
   safeProjectName,
+  NEON_REGION,
   type ProvisionEvent,
 } from '../src/onboarding/vercel.ts';
 
@@ -551,4 +552,24 @@ test('a token revoked mid-poll aborts promptly and blames the token, not Neon', 
   assert.equal(e.status, 401, 'the 401 must surface, not be swallowed by the poll loop');
   assert.ok(clock < 300_000, 'it must not burn the whole timeout');
   assert.match(e.message, /token/i);
+});
+
+test('provisionNeon sends metadata.region — the field Vercel now requires (live 400 fix)', async () => {
+  // A real TallyPrime owner's setup log showed Vercel rejecting the database with
+  // "metadata should have required property 'region'". This pins that the region is sent.
+  let sentBody: unknown;
+  const fetch: typeof globalThis.fetch = async (input, init) => {
+    const path = String(input).replace('https://api.vercel.com', '');
+    if (path.startsWith('/v1/storage/stores/integration/direct')) {
+      sentBody = JSON.parse(String(init?.body ?? '{}'));
+      return new Response(JSON.stringify({ store: { id: 'store_1' } }), { status: 200 });
+    }
+    return new Response('{}', { status: 200 });
+  };
+  const c = new VercelClient({ token: 'tok', fetch, sleep: async () => {}, now: () => 0 });
+  await c.provisionNeon('icfg_1', 'acme-db');
+
+  const body = sentBody as { name?: string; metadata?: { region?: string } };
+  assert.equal(body.metadata?.region, NEON_REGION, 'the required region must be in the request');
+  assert.equal(body.name, 'acme-db');
 });
