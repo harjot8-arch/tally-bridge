@@ -113,7 +113,7 @@ test('fieldCountOfRequest reads the request on the wire, so it cannot drift from
   assert.equal(fieldCountOfRequest(groupsRequest({ booksFrom: '2026-04-01', asOf: '2026-07-16' })), 7);
   assert.equal(
     fieldCountOfRequest(billsRequest({ booksFrom: '2026-04-01', asOf: '2026-07-16', side: 'payable' })),
-    6,
+    7,
   );
   assert.equal(fieldCountOfRequest('<ENVELOPE/>'), 0);
   // A field count is about the SCHEMA, so a company named "<XMLTAG>F01</XMLTAG>" must not vote.

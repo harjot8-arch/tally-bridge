@@ -12,6 +12,7 @@ import {
   assertBillsLookSane,
   bucketFor,
   parseBillRow,
+  billsForSide,
   type RawBill,
 } from '../src/ageing.ts';
 
@@ -33,6 +34,7 @@ const bill = (over: Partial<RawBill> = {}): RawBill => ({
   creditPeriodDays: 0,
   amountPaise: toPaise(1000),
   isAdvance: false,
+  onSide: true,
   ...over,
 });
 
@@ -194,6 +196,7 @@ test('parses a bill row off the wire', () => {
     creditPeriodDays: 30,
     amountPaise: 12500000,
     isAdvance: false,
+    onSide: true,
   });
 });
 
@@ -326,4 +329,60 @@ test('a cell key cannot collide across party/bucket boundaries', () => {
   assert.equal(rows.length, 2);
   assert.equal(rows.find((r) => r.partyName === 'Acme')!.amount, '100.00');
   assert.equal(rows.find((r) => r.partyName === 'Acme 0_30')!.amount, '7.00');
+});
+
+// ---------------------------------------------------------------- the side test (F07)
+//
+// A real TallyPrime 7.0 refused to narrow the Bills collection at all: CHILDOF emptied it and
+// $ClosingBalance was unavailable in filter context, while both worked fine as FIELDS. So the
+// side test and the open-bill test moved into Node, and these are the tests that keep them
+// honest — the failure they guard against is an EMPTY CARD, which looks exactly like a
+// business that is owed nothing.
+
+test('THE SIDE TEST: bills on the other side are dropped, not counted', () => {
+  const kept = billsForSide([
+    bill({ partyName: 'Debtor', amountPaise: 100000, onSide: true }),
+    bill({ partyName: 'Creditor', amountPaise: 250000, onSide: false }),
+  ]);
+  assert.equal(kept.length, 1);
+  assert.equal(kept[0]?.partyName, 'Debtor');
+});
+
+test('settled bills are dropped in Node, because Tally will not filter them', () => {
+  // This WAS `<FILTER>NOT $$IsZero:$ClosingBalance</FILTER>`. On a real Tally that filter
+  // returned zero rows out of 141 while every one of those 141 carried a non-zero balance.
+  const kept = billsForSide([
+    bill({ amountPaise: 0 }),
+    bill({ amountPaise: -1 }),
+    bill({ amountPaise: 500 }),
+  ]);
+  assert.equal(kept.length, 2);
+});
+
+test('an ABSENT side column means keep, never drop', () => {
+  // A Tally that does not answer F07 must degrade to the old behaviour, not to an empty card.
+  const parsed = parseBillRow(['Party', '2026-01-01', '30', '1000.00', '0', '40']);
+  assert.equal(parsed?.onSide, true);
+  assert.equal(billsForSide([parsed!]).length, 1);
+});
+
+test('F07 is read from the wire: "1" is on-side, anything else is not', () => {
+  const on = parseBillRow(['P', 'd', '0', '1.00', '0', '5', '1']);
+  const off = parseBillRow(['P', 'd', '0', '1.00', '0', '5', '0']);
+  assert.equal(on?.onSide, true);
+  assert.equal(off?.onSide, false);
+});
+
+test('A BROKEN SIDE TEST IS LOUD: no bill on either side cannot mean "owed nothing"', () => {
+  // If $$IsLedOfGrp does not resolve on a bill, F07 is 0 for EVERY row and the card silently
+  // empties. A book where not one bill belongs to any party group does not exist — so this
+  // shape is always a broken extraction, and must never reach a dashboard.
+  const bills = [bill({ partyName: 'Real', onSide: false }), bill({ partyName: 'Also Real', onSide: false })];
+  assert.throws(() => assertBillsLookSane(bills), /NOT ONE is in the group/);
+});
+
+test('the side gate does not fire when even one bill is on-side', () => {
+  assert.doesNotThrow(() =>
+    assertBillsLookSane([bill({ onSide: false }), bill({ onSide: true })]),
+  );
 });

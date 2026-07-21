@@ -130,7 +130,34 @@ export type BillPartyMethod = '$PartyName' | '$LedgerName' | '$..Name';
  * maintains natively. THIS is why voucher lines are never needed, and it is the single reason
  * this product can be honest about "we only pull what's necessary".
  *
- * Payables are the same request with a different CHILDOF. One code path, one parameter.
+ * Payables are the same request with a different group. One code path, one parameter.
+ *
+ * ## Three things a real TallyPrime 7.0 refuted, all of which used to be in this request
+ *
+ * The first run against real books returned ZERO rows for all six probed variants, against a
+ * company with 141 bills. An isolation ladder — strip the request bare, add one clause back at
+ * a time — separated three independent faults that no amount of varying the collection type
+ * and party method could have told apart:
+ *
+ * 1. **CHILDOF empties the collection.** Bare: 141 rows. Add `CHILDOF $$GroupSundryDebtors`:
+ *    zero. Add the group's own literal name instead: still zero. So it is CHILDOF on a Bills
+ *    collection that does not work here, not the group reference — `$$GroupSundryDebtors`
+ *    itself resolves correctly (it matches exactly one group).
+ * 2. **`$ClosingBalance` is unavailable in FILTER context.** All 141 bills carry a non-zero
+ *    `$ClosingBalance` as a FIELD, and every filter over that same expression returns zero
+ *    rows — including via `$$NumValue`. A control filter (`NOT $$IsEmpty:$Name`) passes on the
+ *    same collection, so filters work; this value is simply not there when the filter runs.
+ *    The open-bill test therefore happens in Node, where the balance demonstrably exists.
+ * 3. **`$PartyName` is empty on every bill.** `$LedgerName` names all 141. This is the exact
+ *    silent failure this file's `assertBillsLookSane` was written for: a wrong party method
+ *    returns an empty column, not an error.
+ *
+ * ## Why the side test is a FIELD and not a FILTER
+ *
+ * Fields work on this collection and filters over fetched values do not, so F07 asks
+ * `$$IsLedOfGrp` per bill and Node keeps the rows that answer 1. The whole collection is 141
+ * rows — filtering client-side costs nothing, and it fails LOUDLY (`assertBillsLookSane`)
+ * rather than emptying a card, which is the failure mode that cost this feature two rounds.
  */
 export function billsRequest(opts: {
   company?: string | undefined;
@@ -141,9 +168,8 @@ export function billsRequest(opts: {
   partyMethod?: BillPartyMethod;
 }): string {
   const collectionType = opts.collectionType ?? 'Bills';
-  const partyMethod = opts.partyMethod ?? '$PartyName';
-  const childOf =
-    opts.side === 'receivable' ? '$$GroupSundryDebtors' : '$$GroupSundryCreditors';
+  const partyMethod = opts.partyMethod ?? '$LedgerName';
+  const group = opts.side === 'receivable' ? '$$GroupSundryDebtors' : '$$GroupSundryCreditors';
 
   return buildRequest({
     id: 'TSBills',
@@ -159,17 +185,15 @@ export function billsRequest(opts: {
       // Raw days since the bill date. Bucketing happens in Node, not TDL, so buckets stay
       // tunable without redeploying TDL. Due-date ageing is F06 - F03.
       { tag: 'F06', set: '$$Number:($$Date:##SVToDate - $BillDate)' },
+      // WHICH SIDE this bill is on, as a FIELD rather than as a collection filter. See below.
+      { tag: 'F07', set: `if $$IsLedOfGrp:${partyMethod}:${group} then 1 else 0` },
     ],
     collection: {
       type: collectionType,
-      childOf,
-      belongsTo: true,
       // `Name` (the bill reference) is FETCHED because Tally needs it to build the collection,
       // but it is never emitted as a field — see EXCLUDED_BY_DESIGN in core.
-      fetch: ['PartyName', 'BillDate', 'BillCreditPeriod', 'ClosingBalance', 'IsAdvance', 'Name'],
-      filter: 'FltrOpen',
+      fetch: ['PartyName', 'LedgerName', 'BillDate', 'BillCreditPeriod', 'ClosingBalance', 'IsAdvance', 'Name'],
     },
-    systemFormulae: { FltrOpen: 'NOT $$IsZero:$ClosingBalance' },
   });
 }
 

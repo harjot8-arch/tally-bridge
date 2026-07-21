@@ -30,6 +30,10 @@ import {
   describeFailure,
   groupsRequest,
   parseBillRow,
+  billsForSide,
+  assertBillsLookSane,
+  stockRequest,
+  revenueRequest,
   probeRequest,
   billsRequest,
   xmlTagResponseToRows,
@@ -129,6 +133,8 @@ async function main() {
   // that needs to name the debtors group uses this, so a renamed or differently-spaced group
   // ("Sundry Debtors " with a trailing space is common) cannot be mistaken for a broken query.
   let debtorGroupName = '';
+  /** Stage 8b's oracle for the stock SIGN — the one remaining known-open risk. */
+  let stockInHandPaise: number | undefined;
   if (!groupsRes.ok) {
     bad(describeFailure(groupsRes.failure));
   } else {
@@ -155,6 +161,12 @@ async function main() {
       ok(`Sundry Debtors closing balance is ${debtorsHaveBalance ? 'NON-ZERO' : 'zero'} (${redactAmount(bal)})`);
     } else {
       warn('no "Sundry Debtors" group found — unusual; the ageing check below is inconclusive');
+    }
+
+    const sih = rows.find((r) => /stock[- ]?in[- ]?hand/i.test(r[0] ?? ''));
+    if (sih) {
+      const n = Number(sih[5] ?? '0');
+      if (Number.isFinite(n)) stockInHandPaise = Math.round(n * 100);
     }
   }
 
@@ -559,6 +571,102 @@ async function main() {
       );
       if (rws.length > 0) ok(`filter ${label} -> ${rws.length} rows`);
       else bad(`filter ${label} -> 0 rows`);
+    }
+  }
+
+  // ---------------------------------------------------------------- 8. the shipped requests
+  //
+  // Everything above diagnoses. This stage runs what the product ACTUALLY SENDS and reads the
+  // answer the way the product reads it — including the two sections nothing had ever probed.
+  // Stages 5-7 could all pass while the shipped request still failed; only this closes that gap.
+  log();
+  log('='.repeat(72));
+  log('8. The requests the product actually ships');
+  log('='.repeat(72));
+
+  // ---- 8a. Ageing, both sides, through the real parse + filter + assert ---------------
+  log();
+  log('8a. Ageing (the fixed request: no CHILDOF, no balance filter, party = $LedgerName)');
+  for (const side of ['receivable', 'payable'] as const) {
+    const res = await transport.request(billsRequest({ company, booksFrom, asOf, side }));
+    if (!res.ok) {
+      bad(`${side.padEnd(10)} ${describeFailure(res.failure)}`);
+      continue;
+    }
+    const parsed = xmlTagResponseToRows(res.xml).map(parseBillRow).filter((b) => b !== undefined);
+    const named = parsed.filter((b) => b.partyName.trim().length > 0).length;
+    const onSide = parsed.filter((b) => b.onSide).length;
+    const kept = billsForSide(parsed);
+
+    log(`    ${side}: ${parsed.length} bills, ${named} named, ${onSide} in the group, ${kept.length} open+on-side`);
+
+    // The product refuses to publish rather than show a blank or invented card. Running the
+    // real gate here means a refusal shows up in this output instead of on a customer's phone.
+    try {
+      assertBillsLookSane(parsed);
+      if (kept.length > 0) {
+        ok(`${side} PASSES the shipped gate — this card will render`);
+        const worst = kept.reduce((a, b) => (Math.abs(b.amountPaise) > Math.abs(a.amountPaise) ? b : a));
+        log(`      largest party: ${redact(worst.partyName)}  overdue days: ${worst.daysSinceBill - worst.creditPeriodDays}`);
+      } else if (parsed.length === 0) {
+        warn(`${side}: no bills at all — cannot tell a working query from an empty book`);
+      } else {
+        bad(`${side}: bills exist but NONE survived the open+on-side cut`);
+      }
+    } catch (e) {
+      bad(`${side} REFUSED by the shipped gate: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  // ---- 8b. Stock, and THE SIGN — the last known-open risk in the product --------------
+  log();
+  log('8b. Stock value, and the SIGN (a flip here inverts every stock figure)');
+  const stockRes = await transport.request(stockRequest({ company, asOf }));
+  if (!stockRes.ok) {
+    bad(describeFailure(stockRes.failure));
+  } else {
+    const rows = xmlTagResponseToRows(stockRes.xml);
+    if (rows.length === 0) {
+      warn('0 stock groups — a service business, or the StockGroup collection is unsupported');
+    } else {
+      ok(`${rows.length} stock groups`);
+      const vals = rows.map((r) => Number(r[1] ?? '0')).filter((n) => Number.isFinite(n));
+      const net = vals.reduce((a, b) => a + b, 0);
+      const neg = vals.filter((v) => v < 0).length;
+      log(`      ${neg}/${vals.length} groups report a NEGATIVE value; net is ${net < 0 ? 'NEGATIVE' : 'POSITIVE'}`);
+      // The oracle: Stock-in-Hand is an asset, so under this codebase's Dr-negative convention
+      // its group balance is negative. Stock groups must agree with it, or the card inverts.
+      if (stockInHandPaise === undefined) {
+        warn('no Stock-in-Hand group to check against — the sign stays UNRESOLVED');
+      } else if (stockInHandPaise === 0) {
+        warn('Stock-in-Hand is zero — no usable reference, the sign stays UNRESOLVED');
+      } else {
+        const refNeg = stockInHandPaise < 0;
+        const stkNeg = net < 0;
+        if (refNeg === stkNeg) ok('stock groups AGREE with the Stock-in-Hand reference -> sign VERIFIED');
+        else bad('stock groups DISAGREE with Stock-in-Hand -> THE STOCK CARD WOULD BE INVERTED');
+      }
+    }
+  }
+
+  // ---- 8c. Monthly revenue — the sales trend, also never probed ----------------------
+  log();
+  log('8c. Monthly revenue (the sales trend backfills 12 of these)');
+  const monthStart = `${asOf.slice(0, 7)}-01`;
+  const revRes = await transport.request(revenueRequest({ company, from: monthStart, to: asOf }));
+  if (!revRes.ok) {
+    bad(describeFailure(revRes.failure));
+  } else {
+    const rows = xmlTagResponseToRows(revRes.xml);
+    if (rows.length === 0) {
+      bad('0 revenue groups this month -> the sales trend and profit card would be EMPTY');
+    } else {
+      ok(`${rows.length} revenue groups for ${monthStart}..${asOf}`);
+      const withParent = rows.filter((r) => (r[2] ?? '').length > 0).length;
+      log(`      ${withParent}/${rows.length} carry a parent (needed so nested groups are not double-counted)`);
+      const sales = rows.filter((r) => /sales/i.test(r[0] ?? '')).length;
+      if (sales > 0) ok(`${sales} group(s) match /sales/ -> the trend has something to plot`);
+      else warn('no group matches /sales/ — the trend would be blank for this book');
     }
   }
 

@@ -9,6 +9,7 @@ import {
   groupsRequest,
   fieldCountOfRequest,
   parseBillRow,
+  billsForSide,
   probeCapabilities,
   probeRequest,
   revenueRequest,
@@ -526,7 +527,15 @@ async function ageingSection(
   // BEFORE the watermark advances, so the next cycle retries rather than skipping forever.
   assertBillsLookSane(bills);
 
-  const agg = aggregateAgeing(bills, { companyGuid: info.companyGuid, asOf, side });
+  // The Bills collection cannot be narrowed to one side or to open bills in the TDL on a real
+  // TallyPrime 7.0 (see the note on `billsRequest`), so both cuts happen here. `bills`, not
+  // the filtered set, is what gets asserted above — a side test that discarded everything must
+  // read as a broken extraction, never as a company that owes nothing.
+  const agg = aggregateAgeing(billsForSide(bills), {
+    companyGuid: info.companyGuid,
+    asOf,
+    side,
+  });
 
   return {
     section,

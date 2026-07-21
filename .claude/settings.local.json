@@ -17,16 +17,18 @@
       "Bash(python3 -c ' *)",
       "Bash(curl -fsSL --http1.1 --retry 3 \"https://api.github.com/repos/ruvnet/ruflo/git/trees/main?recursive=1\" -o tree.json)",
       "Skill(dataviz)",
-      "Bash(node scripts/validate_palette.js \"#1c4f8a,#2e6b2e,#b4436c,#c98a00,#0f7d6b,#c9541f,#5a3fa0,#b3272d\" --mode light --surface \"#f4efe3\")"
+      "Bash(node scripts/validate_palette.js \"#1c4f8a,#2e6b2e,#b4436c,#c98a00,#0f7d6b,#c9541f,#5a3fa0,#b3272d\" --mode light --surface \"#f4efe3\")",
+      "Read(//Users/hsa/workspace/website/**)",
+      "Bash(claude --resume f972248b-0ffb-444e-92d4-56635116b512)"
     ]
   },
+  "disabledMcpjsonServers": [
+    "claude-flow"
+  ],
   "enabledPlugins": {
     "ponytail@ponytail": true,
     "superpowers@superpowers-marketplace": true,
     "open-code-review@open-code-review": true,
     "security-guidance@claude-plugins-official": true
-  },
-  "disabledMcpjsonServers": [
-    "claude-flow"
-  ]
+  }
 }
