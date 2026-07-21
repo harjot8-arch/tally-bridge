@@ -34,9 +34,17 @@ jobs:
       - name: Build the app
         run: npm run build -w @tally-bridge/bridge
 
-      # electron-builder rebuilds better-sqlite3 for Electron's ABI (the toolchain is present
-      # here) and packages the NSIS installer. No signing — the .exe is unsigned, so SmartScreen
-      # will warn on first run. That is expected until an OV certificate is added.
+      # Rebuild better-sqlite3 against Electron's ABI. windows-latest ships the C++ toolchain, so
+      # this compile (which fails on a bare user PC) succeeds here. We do it OURSELVES rather than
+      # let electron-builder do it, because electron-builder's own rebuild runs `npm install
+      # --omit=dev` in the flat workspace, which prunes its OWN helper binaries and then fails.
+      - name: Rebuild native module for Electron
+        working-directory: apps/bridge
+        run: npm run dev:rebuild-native -- --yes
+
+      # electron-builder now only PACKAGES (npmRebuild:false) — it copies the Electron-ABI
+      # better-sqlite3 we just built into the NSIS installer, touching node_modules not at all.
+      # Unsigned, so SmartScreen warns on first run until an OV certificate is added.
       - name: Package installer
         working-directory: apps/bridge
         run: npx electron-builder --win --publish never

@@ -54,7 +54,7 @@
     "asarUnpack": [
       "**/*.node"
     ],
-    "npmRebuild": true,
+    "npmRebuild": false,
     "win": {
       "target": "nsis",
       "artifactName": "Tally-Bridge-Setup-${version}.${ext}"
