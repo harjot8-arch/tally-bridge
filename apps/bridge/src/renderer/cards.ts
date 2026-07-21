@@ -48,8 +48,8 @@ function card(title: string, width: CardWidth = 'normal'): HTMLElement {
 }
 
 /** The tone dot that stands in for a colour key. Never colour alone — see the chips too. */
-function dot(tone: Tone): HTMLElement {
-  const d = el('span', `tone-dot ${tone}`);
+function dot(tone: Tone, extra = ''): HTMLElement {
+  const d = el('span', `tone-dot ${tone}${extra ? ` ${extra}` : ''}`);
   d.setAttribute('aria-hidden', 'true');
   return d;
 }
@@ -65,9 +65,9 @@ function big(text: string, tone: Tone): HTMLElement {
  * 2% so that a real-but-tiny amount is still a visible mark rather than nothing — the row's
  * number is beside it, so the bar never has to carry precision.
  */
-function bar(tone: Tone, share: number): HTMLElement {
+function bar(tone: Tone, share: number, extra = ''): HTMLElement {
   const track = el('div', 'bar-track');
-  const fill = el('div', `bar-fill ${tone}`);
+  const fill = el('div', `bar-fill ${tone}${extra ? ` ${extra}` : ''}`);
   setVar(fill, '--w', `${(Math.max(0.02, Math.min(1, share)) * 100).toFixed(2)}%`);
   mount(track, fill);
   return track;
@@ -232,6 +232,7 @@ export function renderAgeing(vm: AgeingCard, t: T): HTMLElement {
     paise: b.amount.paise,
     tone: b.tone,
     title: `${t(bucketKey(b.bucket))}: ${b.amount.display}`,
+    cls: `sev b-${b.bucket}`,
   }));
   const ring = donut(
     slices,
@@ -260,9 +261,12 @@ export function renderAgeing(vm: AgeingCard, t: T): HTMLElement {
     const row = el('div', 'bar-row');
     mount(
       row,
-      dot(b.tone),
+      // The severity ramp: colour encodes HOW LATE — sage (not due) through gold to oxide red
+      // (180+). `b-${bucket}` sets the hue; the tone class stays for the colourblind-safe fallback
+      // and the word beside it. See `.sev` in styles.css.
+      dot(b.tone, `sev b-${b.bucket}`),
       el('span', 'bar-label', t(bucketKey(b.bucket))),
-      bar(b.tone, Math.abs(b.amount.paise) / peak),
+      bar(b.tone, Math.abs(b.amount.paise) / peak, `sev b-${b.bucket}`),
       el('span', 'bar-value', b.amount.compact),
     );
     row.setAttribute(
@@ -557,9 +561,11 @@ export function renderSheet(nodes: readonly TreeNode[], t: T): HTMLElement {
   mount(c, el('div', 'sub', t('sheet.hint')));
 
   const sides = el('div', 'sheet-sides');
-  // `-1` for assets: the side is normalised so its root reads positive. See above.
-  if (assets.length > 0) mount(sides, sheetSide(t('sheet.assets'), assets, -1, t));
+  // LIABILITIES LEFT, ASSETS RIGHT — the layout Tally's own Balance Sheet uses and the one an
+  // Indian SMB owner has read for twenty years. `1` for liabilities (already Cr-positive), `-1`
+  // for assets so the side is normalised to read positive. See the sign discussion above.
   if (liabilities.length > 0) mount(sides, sheetSide(t('sheet.liabilities'), liabilities, 1, t));
+  if (assets.length > 0) mount(sides, sheetSide(t('sheet.assets'), assets, -1, t));
   mount(c, sides);
 
   if (nil.length > 0) {

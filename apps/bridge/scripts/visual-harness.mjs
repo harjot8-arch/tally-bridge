@@ -62,6 +62,9 @@ const VIEWPORTS = [
   // the app sees ~853 effective CSS px, which is where a card that refuses to shrink pushes its
   // number past the window edge. If it reads here, it reads everywhere.
   { name: 'scaled-150pct-1280x720', width: 1280, height: 720, zoom: 1.5 },
+  // Harsher still: 175% scaling on a 1366 panel (~780 effective CSS px). The container-query hero
+  // number must stay inside its panel even here — this is the guard against "values off screen".
+  { name: 'scaled-175pct-1366x768', width: 1366, height: 768, zoom: 1.75 },
 ];
 
 /**

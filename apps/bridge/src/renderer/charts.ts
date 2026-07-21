@@ -35,6 +35,8 @@ export interface Slice {
   tone: Tone;
   /** Already-translated, already-formatted text for the <title> and the aria-label. */
   title: string;
+  /** Extra classes (e.g. the `sev b-<bucket>` severity-ramp hue). Tone stays as the fallback. */
+  cls?: string;
 }
 
 const R = 42;
@@ -114,7 +116,7 @@ export function donut(slices: readonly Slice[], whole: number, ariaLabel: string
     if (s.paise === 0) continue;
     const len = (s.paise / whole) * CIRCUMFERENCE;
     const arc = svg('circle', {
-      class: `donut-slice ${s.tone}`,
+      class: `donut-slice ${s.tone}${s.cls ? ` ${s.cls}` : ''}`,
       cx: '50',
       cy: '50',
       r: String(R),

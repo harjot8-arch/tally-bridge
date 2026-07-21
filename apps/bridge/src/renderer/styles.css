@@ -391,6 +391,11 @@ body {
 .card {
   position: relative;
   min-width: 0;
+  /* Each panel is a QUERY CONTAINER, so the hero number below is sized in `cqi` — a percentage of
+     THIS panel's width, not the viewport's. A viewport-sized number (the old `vw` clamp) outgrew
+     its panel the moment the window was scaled or a value ran long, and ran off the frame. Sized
+     to the panel, it can never do that: a narrow panel gets a smaller number, and it always fits. */
+  container-type: inline-size;
   background: var(--card);
   padding: clamp(18px, 2.4vw, 34px);
   display: flex;
@@ -433,7 +438,9 @@ body {
  * card: the number stays on one line and inside its panel at ~850 effective px.
  */
 .big {
-  font-size: clamp(1.7rem, 1rem + 2.1vw, 3rem);
+  /* Sized to the PANEL (cqi), tuned so a 13-char crore figure (₹99,99,99,999) fits the narrowest
+     panel — the third-width GST/Stock tiles at 150% scaling — with room to spare. */
+  font-size: clamp(1.4rem, 8.5cqi, 2.7rem);
   font-weight: 300;
   letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
@@ -442,9 +449,10 @@ body {
   white-space: nowrap;
 }
 
-/* The hero's number is the biggest thing on the screen — that is the design. */
+/* The hero's number is the biggest thing on the screen — that is the design. Still panel-sized,
+   so it stays huge on a wide hero panel and eases down (never off-frame) on a scaled/narrow one. */
 .card.hero .big {
-  font-size: clamp(2.9rem, 1.4rem + 4.6vw, 5.5rem);
+  font-size: clamp(2.2rem, 11cqi, 4.6rem);
   font-weight: 200;
   letter-spacing: -0.05em;
   line-height: 0.95;
@@ -622,6 +630,32 @@ body {
 .bar-fill.warn { background: color-mix(in srgb, var(--text) 58%, transparent); }
 .bar-fill.bad { background: var(--bad); }
 .bar-fill.neutral { background: color-mix(in srgb, var(--text) 45%, transparent); }
+
+/*
+ * THE AGEING SEVERITY RAMP — the one place colour EARNS its keep: it encodes how late the money
+ * is, so an owner reads the ageing at a glance without doing arithmetic. Earthy and restrained
+ * (sage → green → gold → clay → terracotta → oxide red), never a neon traffic light, so it sits
+ * inside the architecture rather than fighting it. The semantic tone class stays underneath as
+ * the colourblind-safe fallback, and every bucket has its WORD beside it. `--sev` is set per
+ * bucket by `.b-<bucket>`; `.sev` paints it (background for bars/dots, stroke for the ring).
+ */
+.b-not_due  { --sev: #4f8a6b; }
+.b-0_30     { --sev: #6f9a55; }
+.b-31_60    { --sev: #b0902f; }
+.b-61_90    { --sev: #c07a34; }
+.b-91_180   { --sev: #b0532f; }
+.b-180_plus { --sev: var(--bad); }
+@media (prefers-color-scheme: dark) {
+  .b-not_due  { --sev: #5aa17d; }
+  .b-0_30     { --sev: #82b268; }
+  .b-31_60    { --sev: #cca948; }
+  .b-61_90    { --sev: #d68f4a; }
+  .b-91_180   { --sev: #d06b45; }
+  .b-180_plus { --sev: var(--bad); }
+}
+.tone-dot.sev,
+.bar-fill.sev { background: var(--sev); }
+.donut-slice.sev { stroke: var(--sev); }
 
 .bar-value { font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
