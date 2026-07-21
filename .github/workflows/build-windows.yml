@@ -34,13 +34,23 @@ jobs:
       - name: Build the app
         run: npm run build -w @tally-bridge/bridge
 
-      # Rebuild better-sqlite3 against Electron's ABI. windows-latest ships the C++ toolchain, so
-      # this compile (which fails on a bare user PC) succeeds here. We do it OURSELVES rather than
-      # let electron-builder do it, because electron-builder's own rebuild runs `npm install
-      # --omit=dev` in the flat workspace, which prunes its OWN helper binaries and then fails.
-      - name: Rebuild native module for Electron
-        working-directory: apps/bridge
-        run: npm run dev:rebuild-native -- --yes
+      # Give better-sqlite3 an Electron-ABI binary. Done DIRECTLY in its own folder — first try a
+      # published Electron prebuild, then compile from source (windows-latest has the C++
+      # toolchain) — rather than via `npm rebuild`, which npm's install-script gate blocks, and
+      # rather than via electron-builder, whose own rebuild prunes the flat workspace's shared
+      # node_modules and self-destructs. ELECTRON_VER is the single source of truth for the ABI.
+      - name: Rebuild better-sqlite3 for Electron
+        shell: pwsh
+        working-directory: node_modules/better-sqlite3
+        env:
+          ELECTRON_VER: 43.1.1
+        run: |
+          npx --yes prebuild-install -r electron -t $env:ELECTRON_VER --dist-url=https://electronjs.org/headers
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "No prebuild for Electron $env:ELECTRON_VER — compiling from source."
+            npx --yes node-gyp rebuild --release --runtime=electron --target=$env:ELECTRON_VER --dist-url=https://electronjs.org/headers
+          }
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
       # electron-builder now only PACKAGES (npmRebuild:false) — it copies the Electron-ABI
       # better-sqlite3 we just built into the NSIS installer, touching node_modules not at all.
