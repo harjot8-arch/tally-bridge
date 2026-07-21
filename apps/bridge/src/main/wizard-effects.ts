@@ -180,8 +180,9 @@ export function createWizardEffects(deps: WizardEffectDeps): WizardHostEffects {
       } catch (e) {
         // Record the ACTUAL failure — step, HTTP status, Vercel's own message — then rethrow so
         // the owner still sees the calm generic screen. A `VercelError` carries all three.
-        const err = e as { step?: string; status?: number; message?: string };
+        const err = e as { step?: string; status?: number; message?: string; detail?: string };
         dbg(`provision FAILED step=${err.step ?? '?'} status=${err.status ?? '?'} message=${err.message ?? String(e)}`);
+        if (err.detail) dbg(`provision DETAIL ${err.detail}`);
         throw e;
       }
 

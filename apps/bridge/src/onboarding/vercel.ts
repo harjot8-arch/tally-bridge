@@ -60,13 +60,26 @@ export class VercelError extends Error {
   readonly step: ProvisionStep;
   /** True when the owner can fix this themselves — surfaced as an action, not an error code. */
   readonly userActionable: boolean;
+  /**
+   * Vercel's RAW response body, for diagnostics only. Never shown to the owner (the `message` is
+   * the calm sentence), but written to the local setup log so an API-drift failure names itself
+   * instead of hiding behind "would not accept that request".
+   */
+  readonly detail: string | undefined;
 
-  constructor(step: ProvisionStep, status: number, message: string, userActionable = false) {
+  constructor(
+    step: ProvisionStep,
+    status: number,
+    message: string,
+    userActionable = false,
+    detail?: string,
+  ) {
     super(message);
     this.name = 'VercelError';
     this.status = status;
     this.step = step;
     this.userActionable = userActionable;
+    this.detail = detail;
   }
 }
 
@@ -112,7 +125,18 @@ export class VercelClient {
 
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      throw new VercelError(step, res.status, describeVercelError(res.status, text), isActionable(res.status));
+      // Keep the raw body as `detail` (clipped) so the setup log can name the real reason —
+      // `method path` included so an endpoint that Vercel has since moved is obvious. The bearer
+      // token must NEVER appear in any error surface, so scrub it before the body is stored.
+      const raw = `${method} ${path} -> ${text.slice(0, 800)}`;
+      const detail = this.o.token ? raw.split(this.o.token).join('[redacted-token]') : raw;
+      throw new VercelError(
+        step,
+        res.status,
+        describeVercelError(res.status, text),
+        isActionable(res.status),
+        detail,
+      );
     }
     // Some endpoints 204 with no body.
     const text = await res.text();
