@@ -31,6 +31,12 @@ export interface WizardEffectDeps {
   qrPngDataUrl: (text: string) => Promise<string>;
   /** Render + print the sheet HTML. index.ts implements with a hidden window + print dialog. */
   printHtml: (html: string, qrDataUrl: string) => Promise<void>;
+  /**
+   * Diagnostic sink for cloud setup, written to a local file (never the network, never the UI).
+   * The owner-facing failure message is deliberately generic; this is where the real step +
+   * Vercel status + message go so a broken deployment can actually be debugged.
+   */
+  debugLog?: ((line: string) => void) | undefined;
   fetchImpl?: typeof fetch | undefined;
   now?: (() => number) | undefined;
   /**
@@ -139,27 +145,45 @@ export function createWizardEffects(deps: WizardEffectDeps): WizardHostEffects {
       const tenantId = `tn_${hex(8)}`;
       const bootstrapSecret = randomBytes(32).toString('base64');
 
+      const dbg = deps.debugLog ?? (() => {});
+      // Mirror every provisioning event to the diagnostic file, and tee it to onEvent so the UI
+      // still updates. This is the ONLY place the failing step is recorded — the wizard collapses
+      // it to a generic sentence for the owner.
+      const tee = (e: Parameters<typeof onEvent>[0]) => {
+        dbg(`provision ${JSON.stringify(e)}`);
+        onEvent(e);
+      };
+
       const client = new VercelClient({
         token: input.token,
         fetch: fetchImpl,
         sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
         now,
-        log: onEvent,
+        log: tee,
       });
 
-      const result = await provision(
-        client,
-        {
-          projectName: safeProjectName(input.company.name, hex(2)),
-          tenantId,
-          identityPublicKey: input.identityPublicKeyB64,
-          bootstrapSecret,
-          schemaVersion: String(SCHEMA_VERSION),
-          files: loadFiles(),
-        },
-        { pollMs: 3_000, installTimeoutMs: 10 * 60_000, dbTimeoutMs: 5 * 60_000, deployTimeoutMs: 10 * 60_000 },
-        onEvent,
-      );
+      let result;
+      try {
+        result = await provision(
+          client,
+          {
+            projectName: safeProjectName(input.company.name, hex(2)),
+            tenantId,
+            identityPublicKey: input.identityPublicKeyB64,
+            bootstrapSecret,
+            schemaVersion: String(SCHEMA_VERSION),
+            files: loadFiles(),
+          },
+          { pollMs: 3_000, installTimeoutMs: 10 * 60_000, dbTimeoutMs: 5 * 60_000, deployTimeoutMs: 10 * 60_000 },
+          tee,
+        );
+      } catch (e) {
+        // Record the ACTUAL failure — step, HTTP status, Vercel's own message — then rethrow so
+        // the owner still sees the calm generic screen. A `VercelError` carries all three.
+        const err = e as { step?: string; status?: number; message?: string };
+        dbg(`provision FAILED step=${err.step ?? '?'} status=${err.status ?? '?'} message=${err.message ?? String(e)}`);
+        throw e;
+      }
 
       const deploymentUrl = result.deploymentUrl.startsWith('http')
         ? result.deploymentUrl

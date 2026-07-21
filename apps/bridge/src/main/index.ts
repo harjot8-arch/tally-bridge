@@ -1,6 +1,6 @@
 import { app, BrowserWindow, Menu, Tray, ipcMain, nativeImage, powerMonitor, safeStorage, shell } from 'electron';
 import { basename, join } from 'node:path';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { SyncStore } from '@tally-bridge/sync';
 import { SeqCounter } from '@tally-bridge/sync';
 import { TallyTransport } from '@tally-bridge/tally';
@@ -316,9 +316,24 @@ function ensureWizardHost(): WizardHostMain {
   if (wizardHost) return wizardHost;
   if (!keystore || !transport) throw new Error('bridge is still starting up');
 
+  // A local diagnostic file for cloud setup — the owner sees a calm generic message, but the real
+  // step + Vercel status lands here so a failed deployment is debuggable. Path is shown to the
+  // user in the docs: %APPDATA%\Tally Bridge\logs\setup.log (Windows).
+  const logDir = join(app.getPath('userData'), 'logs');
+  const setupLog = join(logDir, 'setup.log');
+  const debugLog = (line: string): void => {
+    try {
+      mkdirSync(logDir, { recursive: true });
+      appendFileSync(setupLog, `${new Date().toISOString()} ${line}\n`);
+    } catch {
+      // Diagnostics must never take setup down.
+    }
+  };
+
   const effects = createWizardEffects({
     transport,
     keystore,
+    debugLog,
     // PNG only. An SVG QR inside an <img> on the page that carries the bridge is a document,
     // not an image, and the renderer refuses it — see isQrDataUrl in the wizard renderer.
     qrPngDataUrl: (text) => QRCode.toDataURL(text, { errorCorrectionLevel: 'M', margin: 2, width: 512 }),
