@@ -104,6 +104,12 @@ body {
   font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow-y: auto;
+  /* The page must NEVER scroll sideways. On a Windows shop PC at 150% display scaling the app
+     sees ~850 effective CSS px, and a card that cannot shrink otherwise pushes its number off the
+     right edge — the "numbers a bit off the screen" an owner reported. This clamps the failure so
+     it can never present as content vanishing past the frame; `min-width: 0` on the cards below is
+     what actually lets them shrink instead. */
+  overflow-x: hidden;
 }
 
 /*
@@ -345,29 +351,58 @@ body::before {
 .grid-row {
   display: grid;
   gap: var(--gap);
+  /* Cards HUG their content (`start`), not stretch to a shared height. Because each row groups
+     cards of similar height (the tiles together, the two ageing books together), the result is a
+     small natural stagger rather than the big empty voids a stretch left under the sparser cards —
+     which an owner read as "poor / sparse". The rows still align at the TOP, which is what carries
+     the "even" reading; only the bottoms differ, by the amount their content actually differs. */
+  align-items: start;
+}
+/* The five-second tiles: cash, profit, stock, GST. DETERMINISTIC columns, not auto-fit — auto-fit
+   was picking 3 columns at a shop-PC width and stranding the fourth tile beside a wide void. Four
+   across on a wide screen; a clean 2x2 once the window (or 150% display scaling) drops it below
+   ~1160px; one per row on a phone-width. `minmax(0, 1fr)` lets every column shrink so a big number
+   never pushes the row wider than the frame. */
+.grid-row.tiles {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* The KPI tiles are EQUAL height — the standard, tidy dashboard look, and what reads as "even".
+     A shorter tile (Stock with two groups) gets a little breathing room at the bottom rather than
+     leaving a dark grid-cell hole beneath it, which is what top-alignment did. The ageing pair and
+     the sales/sheet row keep the row default (start): those cards differ enough that stretching
+     the shorter one would waste real space. */
   align-items: stretch;
 }
-/* The five-second tiles: cash, profit, stock, GST. Four fit a shop-PC width; they wrap and
-   re-even themselves as the window narrows, down to one per row. */
-.grid-row.tiles {
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-}
-/* The two ageing books, wide enough for the donut + bars + a debtor list side by side. */
+/* The two ageing books, side by side, wide enough for the donut + bars + a debtor list. */
 .grid-row.pair {
-  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+@media (max-width: 1160px) {
+  .grid-row.tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 680px) {
+  .grid-row.tiles,
+  .grid-row.pair { grid-template-columns: 1fr; }
+}
+/* Grid items refuse to shrink below their content (`min-width: auto`) — the same overflow trap as
+   the cards. Force every row child to shrink so nothing runs off the frame at 150% scaling. */
+.grid-row > * { min-width: 0; }
 
 .card {
   position: relative;
+  /* A grid/flex item defaults to `min-width: auto`, which REFUSES to shrink below its content —
+     so a wide number or a fixed-column bar row makes the card overflow its track and run off the
+     right of the window. `min-width: 0` lets the card shrink and the ellipsis/wrapping inside do
+     their job. This is the actual fix for numbers running off the screen. */
+  min-width: 0;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 46%),
     var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 20px;
+  padding: 22px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   /* Cards stretch to their row's shared height (`.grid-row { align-items: stretch }`) — that
      equal height is the "placed evenly" the layout is built around, so NO `align-self: start`
      here; it would opt a card back out of the stretch and reintroduce the ragged look. */
@@ -458,12 +493,18 @@ body::before {
  * on.
  */
 .big {
-  font-size: 36px;
+  /* FLUID so the headline never outgrows a narrow or display-scaled card. At a shop-PC width it
+     sits near 31px; on the ~850px effective viewport of a 150%-scaled screen it eases down to
+     ~29px, and narrower still it keeps shrinking — the number stays on one line and inside its
+     card instead of running off the frame. */
+  font-size: clamp(1.5rem, 1.05rem + 1.8vw, 2.2rem);
   font-weight: 700;
   letter-spacing: -0.025em;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
   line-height: 1.1;
+  /* A rupee figure has no spaces to break on, so it stays one line; this just guarantees it. */
+  white-space: nowrap;
 }
 
 .big.good { color: var(--good); }
@@ -599,7 +640,7 @@ body::before {
 
 .bar-row {
   display: grid;
-  grid-template-columns: 8px 84px 1fr auto;
+  grid-template-columns: 8px 84px minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
 }
@@ -636,7 +677,7 @@ body::before {
 
 .ageing-body {
   display: grid;
-  grid-template-columns: 132px 1fr;
+  grid-template-columns: 132px minmax(0, 1fr);
   gap: 18px;
   align-items: center;
   padding: 4px 0;

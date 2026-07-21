@@ -57,6 +57,11 @@ const SHOW = process.argv.includes('--show');
 const VIEWPORTS = [
   { name: 'shop-pc-1366x768', width: 1366, height: 768 },
   { name: 'narrow-1024x768', width: 1024, height: 768 },
+  // A 1080p shop PC at Windows 150% display scaling — the single most common real config, and
+  // the one an owner reported numbers running "off the screen and sticking together" on. At 150%
+  // the app sees ~853 effective CSS px, which is where a card that refuses to shrink pushes its
+  // number past the window edge. If it reads here, it reads everywhere.
+  { name: 'scaled-150pct-1280x720', width: 1280, height: 720, zoom: 1.5 },
 ];
 
 /**
@@ -104,6 +109,9 @@ app.whenReady().then(async () => {
         // Nothing here changes that; this window loads a local file and exists to be lied to.
         sandbox: false,
         preload: join(HERE, 'visual-preload.cjs'),
+        // Emulate Windows display scaling: zoomFactor 1.5 = 150%, shrinking the effective CSS
+        // viewport exactly as a high-DPI shop PC does.
+        zoomFactor: vp.zoom ?? 1,
       },
     });
 
