@@ -61,6 +61,9 @@ function fakeVercel(opts: FakeOpts = {}) {
     }
 
     if (path.startsWith('/v11/projects')) return json({ id: 'prj_1', name: 'acme-dash' });
+    // PATCH /v9/projects/{id}: disabling Vercel deployment protection. Scoped to PATCH so the
+    // GET-by-name that ensureProject uses on a 409 still falls through (the dup-name test needs it).
+    if (path.startsWith('/v9/projects/') && method === 'PATCH') return json({ id: 'prj_1', name: 'acme-dash' });
 
     if (path.startsWith('/v1/storage/stores/integration/direct')) {
       return json({ store: { id: 'store_1', status: 'initializing' } });
@@ -464,6 +467,9 @@ function statefulVercel() {
       projects.set(name, `prj_${projects.size + 1}`);
       return json({ id: projects.get(name), name });
     }
+    // PATCH by project id: disabling deployment protection. Distinct from the GET-by-name below
+    // that ensureProject uses on a 409 retry.
+    if (path.startsWith('/v9/projects/') && init?.method === 'PATCH') return json({ id: 'prj_1' });
     if (path.startsWith('/v9/projects/')) {
       const name = decodeURIComponent(path.slice('/v9/projects/'.length));
       const id = projects.get(name);
@@ -572,4 +578,38 @@ test('provisionNeon sends metadata.region — the field Vercel now requires (liv
   const body = sentBody as { name?: string; metadata?: { region?: string } };
   assert.equal(body.metadata?.region, NEON_REGION, 'the required region must be in the request');
   assert.equal(body.name, 'acme-db');
+});
+
+test('provision disables Vercel deployment protection (else the phone gets a 401)', async () => {
+  // A real setup log showed register 401 "Protected deployment": new Vercel projects lock every
+  // route behind Vercel SSO by default. Provision must turn it off (PATCH ssoProtection:null).
+  const calls: string[] = [];
+  let patchBody: unknown;
+  const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s });
+  const fetch: typeof globalThis.fetch = async (input, init) => {
+    const path = String(input).replace('https://api.vercel.com', '').split('?')[0]!;
+    calls.push(`${init?.method ?? 'GET'} ${path}`);
+    if (path.startsWith('/v2/user')) return json({ user: { username: 'r' } });
+    if (path.startsWith('/v1/integrations/configurations')) return json([{ id: 'icfg_1', slug: 'neon' }]);
+    if (path === '/v11/projects') return json({ id: 'prj_9', name: 'x' });
+    if (path.startsWith('/v9/projects/') && init?.method === 'PATCH') {
+      patchBody = JSON.parse(String(init?.body ?? '{}'));
+      return json({ id: 'prj_9' });
+    }
+    if (path.startsWith('/v1/storage/stores/integration/direct')) return json({ store: { id: 's1' } });
+    if (path.startsWith('/v1/storage/stores/')) return json({ store: { id: 's1', status: 'available' } });
+    if (path.includes('/connections') || path.includes('/env') || path.startsWith('/v2/files')) return json({});
+    if (path.startsWith('/v13/deployments/')) return json({ readyState: 'READY', url: 'x.vercel.app' });
+    if (path.startsWith('/v13/deployments')) return json({ id: 'dpl', url: 'x.vercel.app' });
+    return json({}, 404);
+  };
+  const c = new VercelClient({ token: 't', fetch, sleep: async () => {}, now: () => 0 });
+  await provision(
+    c,
+    { projectName: 'x', tenantId: 'tn', identityPublicKey: 'k', bootstrapSecret: 's', schemaVersion: '1', files: [{ file: '.vercel/output/config.json', sha: 'a', size: 1, data: new Uint8Array([1]) }] },
+    { pollMs: 1, installTimeoutMs: 1000, dbTimeoutMs: 1000, deployTimeoutMs: 1000 },
+    () => {},
+  );
+  assert.ok(calls.some((c) => c.startsWith('PATCH /v9/projects/prj_9')), 'must PATCH the project to disable protection');
+  assert.equal((patchBody as { ssoProtection?: unknown }).ssoProtection, null, 'ssoProtection must be nulled');
 });

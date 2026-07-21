@@ -235,6 +235,25 @@ export class VercelClient {
     });
   }
 
+  /**
+   * Turn OFF Vercel Deployment Protection (Vercel Authentication) for this project.
+   *
+   * New Vercel projects now enable "Vercel Authentication" by default, which puts EVERY route —
+   * `/api/register`, the login page, the dashboard — behind a Vercel SSO login. That makes the
+   * deployment unreachable by the Bridge AND by the owner's phone (confirmed by a live 401
+   * "Protected deployment"). It must be off for the product to work at all.
+   *
+   * This does NOT weaken the security model: the server only ever serves ciphertext, every data
+   * route requires the app's own session (209 server tests), and the numbers are opened in the
+   * browser with the passphrase-derived key. Vercel's SSO would only block legitimate access, not
+   * protect the data — the crypto already does that.
+   */
+  async disableDeploymentProtection(projectId: string): Promise<void> {
+    await this.call('create_project', 'PATCH', `/v9/projects/${projectId}${this.qs()}`, {
+      ssoProtection: null,
+    });
+  }
+
   /** Look a project up by name. `undefined` when it does not exist — a 404 is an answer here. */
   async findProject(name: string): Promise<{ id: string; name: string } | undefined> {
     try {
@@ -529,6 +548,10 @@ export async function provision(
   // Adopts the project if a previous attempt already created it — see `ensureProject`. This is
   // what makes "Try again" work for the owner whose wifi dropped mid-setup.
   const project = await client.ensureProject(input.projectName);
+  // New projects default to Vercel Authentication, which 401s every route — including the owner's
+  // phone. Turn it off now, before anything tries to reach the deployment. The data is protected
+  // by the crypto + session auth, not by locking the whole site behind a Vercel login.
+  await client.disableDeploymentProtection(project.id);
 
   step('provision_database', 'Creating your database…');
   const db = await client.provisionNeon(icfg, `${input.projectName}-db`);
