@@ -63,6 +63,7 @@ export const SECTIONS = [
   'company',
   'group_balance',
   'cash_bank',
+  'duties_taxes',
   'ageing_receivable',
   'ageing_payable',
   'stock_value',
@@ -118,6 +119,16 @@ export type CashBankBalance = {
   parent: string;
   closing: Amount;
 }
+
+/**
+ * A tax ledger balance under the Duties & Taxes group — CGST, SGST, IGST, ITC, TDS payable.
+ *
+ * Structurally identical to CashBankBalance (ledger name, parent, closing balance) and kept as
+ * its own alias so the two sections read distinctly at every call site. Ledger grain is the
+ * whole point: "Duties & Taxes: ₹2,40,000" answers nothing an owner acts on, but "IGST Payable
+ * ₹1,80,000 / CGST ₹30,000 / SGST ₹30,000" is the number they take to their accountant.
+ */
+export type DutiesTaxesBalance = CashBankBalance;
 
 /** Long-tail rollup party name. Chosen so it cannot collide with a real Tally ledger name. */
 export const OTHERS_PARTY = '__OTHERS__';
@@ -185,6 +196,7 @@ export type SectionPayload =
   | { section: 'company'; rows: Company[] }
   | { section: 'group_balance'; rows: GroupBalance[] }
   | { section: 'cash_bank'; rows: CashBankBalance[] }
+  | { section: 'duties_taxes'; rows: DutiesTaxesBalance[] }
   | { section: 'ageing_receivable'; rows: AgeingBucketRow[]; totals: AgeingTotalRow[] }
   | { section: 'ageing_payable'; rows: AgeingBucketRow[]; totals: AgeingTotalRow[] }
   | { section: 'stock_value'; rows: StockValueRow[] }

@@ -1,5 +1,6 @@
 import {
   SCHEMA_VERSION,
+  SECTIONS,
   type CanonicalValue,
   type IsoDate,
   type Section,
@@ -158,18 +159,11 @@ export async function runCycle(deps: OrchestratorDeps, seq: SeqCounter): Promise
       deps.store.resetCompany(company.companyGuid);
     }
 
+    // A 'full' pull is EVERY section, taken from the one canonical list in core rather than a
+    // hand-maintained copy — a second copy silently drops a new section from first-sight and
+    // backup-restore syncs, which is exactly how `duties_taxes` was missing here for one commit.
     const sections =
-      decision.action === 'partial'
-        ? decision.sections
-        : ([
-            'company',
-            'group_balance',
-            'cash_bank',
-            'ageing_receivable',
-            'ageing_payable',
-            'stock_value',
-            'period_revenue',
-          ] as Section[]);
+      decision.action === 'partial' ? decision.sections : ([...SECTIONS] as Section[]);
 
     const extracted = await deps.extract(company.companyGuid, sections);
 

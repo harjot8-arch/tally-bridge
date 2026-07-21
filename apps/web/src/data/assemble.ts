@@ -13,11 +13,13 @@ import {
   ageingCard,
   balanceSheetTree,
   cashBankCard,
+  dutiesTaxesCard,
   profitCard,
   salesTrendCard,
   stockCard,
   type AgeingCard,
   type CashBankCard,
+  type DutiesTaxesCard,
   type ProfitCard,
   type StockCard,
   type TreeNode,
@@ -47,6 +49,7 @@ export interface CompanyCards {
   name: string;
   asOf: IsoDate;
   cashBank?: CashBankCard | undefined;
+  dutiesTaxes?: DutiesTaxesCard | undefined;
   receivables?: AgeingCard | undefined;
   payables?: AgeingCard | undefined;
   profit?: ProfitCard | undefined;
@@ -104,6 +107,11 @@ export function assembleCompanyCards(
   if (acc.sections.has('cash_bank')) {
     cards.cashBank = tryCard('cash_bank', () =>
       cashBankCard(rowsOf<CashBankBalance>(acc.sections.get('cash_bank'))),
+    );
+  }
+  if (acc.sections.has('duties_taxes')) {
+    cards.dutiesTaxes = tryCard('dutiesTaxes', () =>
+      dutiesTaxesCard(rowsOf<CashBankBalance>(acc.sections.get('duties_taxes'))),
     );
   }
   if (acc.sections.has('ageing_receivable')) {

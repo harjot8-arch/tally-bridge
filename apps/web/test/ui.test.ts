@@ -275,6 +275,47 @@ test('mapping: real figures land on the right keys with Indian grouping', () => 
   }
 });
 
+test('mapping: LEDGER-GRAIN tax fills the tax slots — CGST/SGST/IGST as real lines', () => {
+  // The feature the owner asked for: not "Duties & Taxes ₹2,40,000" but the ledger breakdown.
+  // When the duties_taxes section is present, the tax slots come from it, not the group tree.
+  const cards = cardsFrom({
+    duties_taxes: {
+      section: 'duties_taxes',
+      rows: [
+        { companyGuid: GUID, asOf: AS_OF, ledgerName: 'IGST Payable', parent: 'Duties & Taxes', closing: '180000.00' },
+        { companyGuid: GUID, asOf: AS_OF, ledgerName: 'CGST Payable', parent: 'Duties & Taxes', closing: '30000.00' },
+        { companyGuid: GUID, asOf: AS_OF, ledgerName: 'SGST Payable', parent: 'Duties & Taxes', closing: '30000.00' },
+      ],
+    },
+  });
+  const v = mapCompany(cards, FMT);
+  assert.equal(v.text['tax'], '₹2,40,000'); // net, Indian grouping
+  assert.equal(v.text['taxC1Name'], 'IGST Payable'); // largest first
+  assert.equal(v.text['taxC1'], '₹1,80,000');
+  assert.equal(v.text['taxC2Name'], 'CGST Payable');
+  assert.equal(v.text['taxC3Name'], 'SGST Payable');
+});
+
+test('mapping: the ledger tax card OVERRIDES the group-tree fallback when both are present', () => {
+  // A book that syncs both must show the ledger detail, not the coarse group figure.
+  const cards = cardsFrom({
+    group_balance: {
+      section: 'group_balance',
+      rows: [{
+        companyGuid: GUID, asOf: AS_OF, groupName: 'Duties & Taxes', parent: '',
+        primaryGroup: 'Duties & Taxes', isRevenue: false, opening: '0.00', closing: '999999.00',
+      }],
+    },
+    duties_taxes: {
+      section: 'duties_taxes',
+      rows: [{ companyGuid: GUID, asOf: AS_OF, ledgerName: 'IGST Payable', parent: 'Duties & Taxes', closing: '180000.00' }],
+    },
+  });
+  const v = mapCompany(cards, FMT);
+  assert.equal(v.text['tax'], '₹1,80,000'); // the ledger total, NOT ₹9,99,999 from the group
+  assert.equal(v.text['taxC1Name'], 'IGST Payable');
+});
+
 test('mapping: missing sections must never surface a number — em dash or hidden, never 0', () => {
   const v = mapCompany({}, FMT);
   for (const [k, s] of Object.entries(v.text)) {

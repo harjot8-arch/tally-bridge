@@ -33,6 +33,9 @@ interface FakeTallyConfig {
   /** Bills rows, as Tally would emit them: [party, billDate, creditDays, amount, isAdv, days]. */
   bills?: string[][];
   cashBankAmount?: string;
+  dutiesTaxesAmount?: string;
+  /** Emit F07=0 so every bill reads off-side — models a Tally where $$IsLedOfGrp fails. */
+  billsOffSide?: boolean;
   /**
    * What the StockGroup collection's `$ClosingValue` idiom emits — THE doubtful sign. The
    * default matches the (verified) group idiom; set a positive value to model the Tally where
@@ -97,6 +100,15 @@ async function startFakeTally(cfg: FakeTallyConfig = {}): Promise<FakeTally> {
         return;
       }
 
+      if (body.includes('<ID>TSDutiesTaxes</ID>')) {
+        // Cr-positive: a GST payable is a liability, so it arrives POSITIVE — not flipped.
+        send(
+          '<ENVELOPE><F01>IGST Payable</F01><F02>Duties &amp; Taxes</F02>' +
+            `<F03>${cfg.dutiesTaxesAmount ?? '180000.00'}</F03></ENVELOPE>`,
+        );
+        return;
+      }
+
       if (body.includes('<ID>TSBills</ID>')) {
         const payable = body.includes('$$GroupSundryCreditors');
         const rows = cfg.bills ?? [
@@ -106,10 +118,15 @@ async function startFakeTally(cfg: FakeTallyConfig = {}): Promise<FakeTally> {
         send(
           '<ENVELOPE>' +
             rows
-              .map((r) =>
-                r
-                  .map((v, i) => `<F0${i + 1}>${payable && i === 3 ? flipSign(v) : v}</F0${i + 1}>`)
-                  .join(''),
+              .map(
+                (r) =>
+                  r
+                    .map((v, i) => `<F0${i + 1}>${payable && i === 3 ? flipSign(v) : v}</F0${i + 1}>`)
+                    .join('') +
+                  // F07 is the on-side flag: $$IsLedOfGrp on the party. Every test bill genuinely
+                  // belongs to the group being asked about, so the real Tally would answer 1.
+                  // Without this the request's 7th field is empty and billsForSide drops every row.
+                  `<F07>${cfg.billsOffSide ? '0' : '1'}</F07>`,
               )
               .join('') +
             '</ENVELOPE>',
@@ -268,6 +285,7 @@ test('END TO END: probes, extracts every section, seals, and uploads', async () 
       'ageing_receivable',
       'cash_bank',
       'company',
+      'duties_taxes',
       'group_balance',
       'period_revenue',
       'stock_value',
@@ -343,6 +361,22 @@ test('AMOUNTS SURVIVE EXACTLY, and Dr stays negative', async () => {
 
     const stock = await open(h, 'stock_value');
     assert.equal((stock.rows as Array<{ closingValue: string }>)[0]!.closingValue, '-88000.25');
+
+    // Duties & Taxes at LEDGER grain: a GST payable is a liability, Cr POSITIVE, and NOT flipped —
+    // the opposite of cash/bank. If this ever arrives negative, the tax card would read backwards.
+    const tax = await open(h, 'duties_taxes');
+    assert.deepEqual(tax, {
+      section: 'duties_taxes',
+      rows: [
+        {
+          companyGuid: 'guid-acme',
+          asOf: '2026-07-16',
+          ledgerName: 'IGST Payable',
+          parent: 'Duties & Taxes',
+          closing: '180000.00',
+        },
+      ],
+    });
 
     const groups = await open(h, 'group_balance');
     const sales = (groups.rows as Array<{ groupName: string; closing: string; isRevenue: boolean }>).find(

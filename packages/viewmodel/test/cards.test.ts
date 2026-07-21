@@ -5,6 +5,7 @@ import {
   ageingCard,
   balanceSheetTree,
   cashBankCard,
+  dutiesTaxesCard,
   profitCard,
   salesTrendCard,
   stockCard,
@@ -485,4 +486,47 @@ test('all-equal periods are flat, not a fall', () => {
   const card = salesTrendCard([rev('2026-06', 'Sales Accounts', 100), rev('2026-07', 'Sales Accounts', 100)]);
   assert.equal(card.tone, 'good', 'holding steady is not a warning');
   assert.equal(card.peak.raw, 100);
+});
+
+// ---------------------------------------------------------------- duties & taxes
+
+test('DUTIES & TAXES: a payable reads POSITIVE and is NOT flipped, unlike cash/bank', () => {
+  // Duties & Taxes is a liability group. A GST payable is a Cr balance, positive in our
+  // convention, and that IS the honest reading: "IGST Payable ₹1,80,000" is money owed. Flipping
+  // it (as cash/bank does) would show a minus on a real liability.
+  const rows: CashBankBalance[] = [
+    { ...base, ledgerName: 'IGST Payable', parent: 'Duties & Taxes', closing: amt(180000) },
+    { ...base, ledgerName: 'CGST', parent: 'Duties & Taxes', closing: amt(30000) },
+    { ...base, ledgerName: 'SGST', parent: 'Duties & Taxes', closing: amt(30000) },
+  ];
+  const card = dutiesTaxesCard(rows);
+  assert.equal(card.total.raw, 240000);
+  assert.equal(card.total.display, '₹2,40,000');
+  assert.equal(card.ledgers[0]!.name, 'IGST Payable');
+  assert.equal(card.ledgers[0]!.balance.display, '₹1,80,000');
+  assert.equal(card.tone, 'neutral');
+});
+
+test('input credit (ITC) is a NEGATIVE line and nets against payables', () => {
+  const rows: CashBankBalance[] = [
+    { ...base, ledgerName: 'IGST Payable', parent: 'Duties & Taxes', closing: amt(50000) },
+    { ...base, ledgerName: 'Input CGST', parent: 'Duties & Taxes', closing: amt(-70000) },
+  ];
+  const card = dutiesTaxesCard(rows);
+  assert.equal(card.total.raw, -20000, 'net input credit');
+  assert.equal(card.tone, 'good', 'the tax office owing you is good news');
+});
+
+test('tax ledgers rank by absolute size, so a large credit is not buried', () => {
+  const rows: CashBankBalance[] = [
+    { ...base, ledgerName: 'Small Payable', parent: 'Duties & Taxes', closing: amt(1000) },
+    { ...base, ledgerName: 'Big ITC', parent: 'Duties & Taxes', closing: amt(-90000) },
+  ];
+  const card = dutiesTaxesCard(rows);
+  assert.deepEqual(card.ledgers.map((l) => l.name), ['Big ITC', 'Small Payable']);
+});
+
+test('no tax ledgers is a clean neutral zero, not an error', () => {
+  assert.equal(dutiesTaxesCard([]).total.display, '₹0');
+  assert.equal(dutiesTaxesCard([]).tone, 'neutral');
 });

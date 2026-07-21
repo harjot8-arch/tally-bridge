@@ -6,6 +6,7 @@ import {
   assertBillsLookSane,
   billsRequest,
   cashBankRequest,
+  dutiesTaxesRequest,
   groupsRequest,
   fieldCountOfRequest,
   parseBillRow,
@@ -418,6 +419,29 @@ async function extractSection(
         section,
         asOf,
         payload: { section: 'cash_bank', rows: sortRows(mapped, (r) => r.ledgerName) },
+      };
+    }
+
+    case 'duties_taxes': {
+      // Same ledger-grain mechanism as cash_bank, filtered to the Duties & Taxes group. The
+      // real TallyPrime confirmed `$$IsLedOfGrp` on a Ledger collection resolves (Spike A 7c),
+      // so this reuses a mechanism a real book has already validated rather than a new guess.
+      const rows = await ask(
+        transport,
+        dutiesTaxesRequest({ company: info.name, asOf }),
+        TIMEOUTS.sectionMs,
+      );
+      const mapped = rows.map((c) => ({
+        companyGuid,
+        asOf,
+        ledgerName: c[0] ?? '',
+        parent: c[1] ?? '',
+        closing: amountFrom(c[2]),
+      }));
+      return {
+        section,
+        asOf,
+        payload: { section: 'duties_taxes', rows: sortRows(mapped, (r) => r.ledgerName) },
       };
     }
 

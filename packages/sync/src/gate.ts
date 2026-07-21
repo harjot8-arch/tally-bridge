@@ -39,6 +39,7 @@ export type GateDecision =
 const VOUCHER_SECTIONS: Section[] = [
   'group_balance',
   'cash_bank',
+  'duties_taxes',
   'ageing_receivable',
   'ageing_payable',
   'stock_value',
@@ -52,7 +53,13 @@ const VOUCHER_SECTIONS: Section[] = [
  * re-parent a group without touching a single voucher, which changes what the cards say without
  * changing any number.
  */
-const MASTER_SECTIONS: Section[] = ['company', 'group_balance', 'cash_bank', 'stock_value'];
+const MASTER_SECTIONS: Section[] = [
+  'company',
+  'group_balance',
+  'cash_bank',
+  'duties_taxes',
+  'stock_value',
+];
 
 /**
  * An AlterID we are willing to reason about.

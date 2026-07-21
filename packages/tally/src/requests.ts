@@ -117,6 +117,42 @@ export function cashBankRequest(opts: {
   });
 }
 
+/**
+ * Tax ledgers under Duties & Taxes, at LEDGER grain.
+ *
+ * The group figure ("Duties & Taxes: ₹2,40,000") tells the owner nothing they act on; the
+ * ledger lines (IGST / CGST / SGST / ITC) are what goes to the accountant. Same mechanism as
+ * `cashBankRequest`: a Ledger collection filtered by group membership.
+ *
+ * Why `$$IsLedOfGrp` on a LITERAL group name rather than a `$$Group…` function: Spike A stage
+ * 7c confirmed against a real TallyPrime 7.0 that `$$IsLedOfGrp:$Name:"<literal group>"` on a
+ * Ledger collection resolves (933 debtor ledgers), while CHILDOF on a Bills collection did not.
+ * "Duties & Taxes" is a reserved primary group present in every company, so the literal is
+ * stable. `$_PrimaryGroup` equality is OR'd in as a second route — stage 7c showed it resolves
+ * too — so a book that answers on either one is covered.
+ */
+export function dutiesTaxesRequest(opts: { company?: string | undefined; asOf: string }): string {
+  return buildRequest({
+    id: 'TSDutiesTaxes',
+    company: opts.company,
+    toDate: opts.asOf,
+    fields: [
+      { tag: 'F01', set: expr.text('$Name') },
+      { tag: 'F02', set: expr.text('$Parent') },
+      { tag: 'F03', set: expr.amount('$ClosingBalance') },
+    ],
+    collection: {
+      type: 'Ledger',
+      fetch: ['Name', 'Parent', 'ClosingBalance'],
+      filter: 'FltrDutiesTaxes',
+    },
+    systemFormulae: {
+      FltrDutiesTaxes:
+        '$$IsLedOfGrp:$Name:"Duties & Taxes" OR $$IsEqual:$_PrimaryGroup:"Duties & Taxes"',
+    },
+  });
+}
+
 /** The two unverified axes of the ageing request. See `SPIKE_A_VARIANTS`. */
 export type BillsCollectionType = 'Bills' | 'Bill';
 export type BillPartyMethod = '$PartyName' | '$LedgerName' | '$..Name';

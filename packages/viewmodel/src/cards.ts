@@ -129,6 +129,43 @@ export function cashBankCard(rows: readonly CashBankBalance[]): CashBankCard {
   };
 }
 
+// ---------------------------------------------------------------- duties & taxes
+
+export interface DutiesTaxesCard {
+  kind: 'duties_taxes';
+  /** Net tax position: positive = payable (you owe), negative = input credit (refund/offset). */
+  total: MoneyValue;
+  ledgers: Array<{ name: string; balance: MoneyValue }>;
+  tone: Tone;
+}
+
+/**
+ * Tax ledgers under Duties & Taxes, at ledger grain.
+ *
+ * NO sign flip, unlike cash/bank. Duties & Taxes is a LIABILITY group: a GST payable is a Cr
+ * balance and arrives POSITIVE in this codebase's Dr-negative/Cr-positive convention, which is
+ * already the honest reading — "IGST Payable ₹1,80,000" is a positive number an owner owes.
+ * Input credit ledgers (ITC) are Dr and arrive negative, and that is also correct: a negative
+ * line is money the tax office owes back. The total is the net of the two.
+ */
+export function dutiesTaxesCard(rows: readonly CashBankBalance[]): DutiesTaxesCard {
+  const parsed = rows
+    .map((r) => ({ name: r.ledgerName, paise: paiseOf(r.closing) }))
+    // Rank by absolute size: a large input credit is as worth surfacing as a large payable,
+    // and a signed sort would bury it at the bottom.
+    .sort((a, b) => Math.abs(b.paise) - Math.abs(a.paise));
+
+  const totalPaise = sumPaise(parsed.map((l) => l.paise));
+
+  return {
+    kind: 'duties_taxes',
+    total: moneyFromPaise(totalPaise),
+    ledgers: parsed.map((l) => ({ name: l.name, balance: moneyFromPaise(l.paise) })),
+    // Net credit (they owe you) is good news; owing tax is just a fact, not an alarm.
+    tone: totalPaise < 0 ? 'good' : 'neutral',
+  };
+}
+
 // ---------------------------------------------------------------- ageing
 
 export interface AgeingCard {

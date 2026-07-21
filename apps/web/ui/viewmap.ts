@@ -158,13 +158,25 @@ export function mapCompany(cards: Partial<CompanyCards>, fmt: Formatters): Compa
 
   // ---- balance sheet lookups (group_balance; raw sign: Dr negative, Cr positive) ------
   const tree = cards.balanceSheet ?? [];
-  const tax = findNode(tree, /^duties\s*(&|and)\s*taxes$/i);
-  // Cr-positive means "payable" reads positive here, which is the honest orientation.
-  text['tax'] = tax?.amount.display ?? EM;
-  const taxKids = kidsByMagnitude(tax, 3);
-  for (let i = 0; i < 3; i++) {
-    text[`taxC${i + 1}Name`] = taxKids[i]?.name ?? '';
-    text[`taxC${i + 1}`] = taxKids[i]?.amount.display ?? '';
+  // Prefer the LEDGER-grain tax card: "IGST Payable ₹1,80,000" is what the owner acts on, where
+  // the Duties & Taxes GROUP total answers nothing. The group tree is the fallback for a book
+  // that has not synced the duties_taxes section yet. Both read Cr-positive — a payable is a
+  // positive number here, the honest orientation.
+  const dt = cards.dutiesTaxes;
+  if (dt) {
+    text['tax'] = dt.total.display;
+    for (let i = 0; i < 3; i++) {
+      text[`taxC${i + 1}Name`] = dt.ledgers[i]?.name ?? '';
+      text[`taxC${i + 1}`] = dt.ledgers[i]?.balance.display ?? '';
+    }
+  } else {
+    const tax = findNode(tree, /^duties\s*(&|and)\s*taxes$/i);
+    text['tax'] = tax?.amount.display ?? EM;
+    const taxKids = kidsByMagnitude(tax, 3);
+    for (let i = 0; i < 3; i++) {
+      text[`taxC${i + 1}Name`] = taxKids[i]?.name ?? '';
+      text[`taxC${i + 1}`] = taxKids[i]?.amount.display ?? '';
+    }
   }
   const loan = findNode(tree, /^loans\s*\(liability\)$/i);
   text['loan'] = loan?.amount.display ?? EM;

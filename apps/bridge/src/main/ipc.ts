@@ -2,6 +2,7 @@ import type { IsoDate } from '@tally-bridge/core';
 import type {
   AgeingCard,
   CashBankCard,
+  DutiesTaxesCard,
   ProfitCard,
   StockCard,
   TreeNode,
@@ -66,6 +67,7 @@ export interface CompanyCards {
   /** The newest as-of date across this company's sections. */
   asOf: IsoDate;
   cashBank?: CashBankCard | undefined;
+  dutiesTaxes?: DutiesTaxesCard | undefined;
   receivables?: AgeingCard | undefined;
   payables?: AgeingCard | undefined;
   profit?: ProfitCard | undefined;
