@@ -1,6 +1,7 @@
 import type {
   AgeingCard,
   CashBankCard,
+  DutiesTaxesCard,
   ProfitCard,
   StockCard,
   Tone,
@@ -435,6 +436,45 @@ export function renderStock(vm: StockCard, t: T): HTMLElement {
     mount(bars, row);
   }
   mount(c, bars);
+  return c;
+}
+
+// ---------------------------------------------------------------- duties & taxes
+
+/**
+ * The GST position — Duties & Taxes at ledger grain.
+ *
+ * NO sign flip, and that is the whole subtlety (see `dutiesTaxesCard` in the viewmodel). Duties &
+ * Taxes is a LIABILITY group: a GST payable is a Cr balance and arrives POSITIVE, which is already
+ * the honest reading — "CGST Payable ₹4,10,200" is a positive number the owner owes. Input credit
+ * (ITC) is Dr and arrives NEGATIVE, also correct: a negative line is money the tax office owes
+ * back. This renderer prints the card layer's signed strings verbatim and computes nothing.
+ *
+ * The data was synced but had no card until now, so this is information the owner could not see.
+ */
+export function renderDutiesTaxes(vm: DutiesTaxesCard, t: T): HTMLElement {
+  const c = card(t('card.duties'));
+  mount(c, big(vm.total.display, vm.tone));
+  // Net credit reads as good news; owing tax is a plain fact, not an alarm — the tone carries it.
+  mount(c, el('div', 'sub', vm.tone === 'good' ? t('duties.credit') : t('duties.net')));
+
+  if (vm.ledgers.length === 0) {
+    mount(c, emptyNote(t('duties.empty')));
+    return c;
+  }
+
+  // A ledger name out of the customer's Tally file — textContent only, same rule as everywhere.
+  mount(
+    c,
+    collapsibleRows(
+      vm.ledgers.map((l) => {
+        const row = el('div', 'row');
+        mount(row, el('span', 'row-name', l.name), el('span', 'row-value', l.balance.display));
+        return row;
+      }),
+      t,
+    ),
+  );
   return c;
 }
 

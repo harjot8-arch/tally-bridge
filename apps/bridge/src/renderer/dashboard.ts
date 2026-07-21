@@ -3,6 +3,7 @@ import type { SyncStatus } from '../main/scheduler.ts';
 import {
   renderAgeing,
   renderCashBank,
+  renderDutiesTaxes,
   renderEmpty,
   renderProfit,
   renderSheet,
@@ -122,12 +123,6 @@ export function mountDashboard(container: Element, options: DashboardOptions = {
   let selectedGuid: string | undefined;
   let syncing = false;
   let destroyed = false;
-  /**
-   * Watches every card for a height change, so the masonry spans stay true. See layoutMasonry.
-   * Mount-scoped and disconnected in destroy() — an observer that outlives its grid keeps the
-   * whole detached tree alive and re-lays-out nodes nobody can see.
-   */
-  let ro: ResizeObserver | undefined;
   /**
    * THE REQUEST SEQUENCE. Every `refresh()` takes a ticket; only the newest may commit.
    *
@@ -305,31 +300,55 @@ export function mountDashboard(container: Element, options: DashboardOptions = {
     const grid = el('div', 'grid');
 
     /*
-     * The order is the order of the questions, and it is the whole design of this screen:
-     * how much money have I got, am I making a profit, who owes me, who do I owe, how are sales
-     * going, what is on the shelf. The first two are the five-second answer and they sit top-left
-     * where the eye lands; receivables is wide because "who owes me most" is the reason this app
-     * was bought.
+     * EVEN BY CONSTRUCTION, not by a masonry measurement pass.
      *
-     * A card is simply ABSENT when its section has not synced or could not be opened — that is a
-     * state the contract defines and it is not an error. It costs its slot and nothing else; the
-     * `incomplete` banner above is what tells the owner that the picture is partial.
+     * Cards are grouped into rows of like-height peers. Each row is its own auto-fit grid, so a
+     * row of four tiles fills the width evenly AND a row of one still fills it — the board stays
+     * tidy whether Tally returned every section or only two. Within a row the cards share a height
+     * (`align-items: stretch` in styles.css), which is what reads as "placed evenly"; the old
+     * masonry packed tight but left ragged, patchy bottoms, and that is the mess this replaces.
+     *
+     * The order is still the order of the questions: the five-second TILES (cash, profit, stock,
+     * GST) first; then the two AGEING books the app was bought for, side by side; then the sales
+     * trend and, LAST, the balance sheet — the one card an owner READS, expanding groups on
+     * demand (`renderSheet` builds children lazily on open, so a distributor's thousands of nodes
+     * are never all painted at once).
+     *
+     * A card is simply ABSENT when its section did not sync — a defined state, not an error. The
+     * `incomplete` banner above is what says the picture is partial.
      */
-    if (cards?.cashBank) mount(grid, renderCashBank(cards.cashBank, t));
-    if (cards?.profit) mount(grid, renderProfit(cards.profit, t));
-    if (cards?.receivables) mount(grid, renderAgeing(cards.receivables, t));
-    if (cards?.payables) mount(grid, renderAgeing(cards.payables, t));
-    if (cards?.salesTrend) mount(grid, renderTrend(cards.salesTrend, t, locale));
-    if (cards?.stock) mount(grid, renderStock(cards.stock, t));
-    // LAST, and that is the design rather than an afterthought. Everything above answers a
-    // question at a glance; the balance sheet is the one card the owner READS, by expanding the
-    // groups they care about. It goes where the eye arrives after the five-second answers, and
-    // `renderSheet` builds children lazily on open — a distributor's chart of accounts is
-    // several thousand nodes, and painting all of them every fifteen minutes would freeze the
-    // window on the same PC that is running Tally.
-    //
-    // `?.length` for the same reason as `hasNoCards`: an empty tree is a heading over nothing.
-    if (cards?.balanceSheet?.length) mount(grid, renderSheet(cards.balanceSheet, t));
+    const tileCards: HTMLElement[] = [];
+    if (cards?.cashBank) tileCards.push(renderCashBank(cards.cashBank, t));
+    if (cards?.profit) tileCards.push(renderProfit(cards.profit, t));
+    if (cards?.stock) tileCards.push(renderStock(cards.stock, t));
+    if (cards?.dutiesTaxes) tileCards.push(renderDutiesTaxes(cards.dutiesTaxes, t));
+    if (tileCards.length > 0) {
+      const tiles = el('div', 'grid-row tiles');
+      mount(tiles, ...tileCards);
+      mount(grid, tiles);
+    }
+
+    const ageingCards: HTMLElement[] = [];
+    if (cards?.receivables) ageingCards.push(renderAgeing(cards.receivables, t));
+    if (cards?.payables) ageingCards.push(renderAgeing(cards.payables, t));
+    if (ageingCards.length > 0) {
+      const ageing = el('div', 'grid-row pair');
+      mount(ageing, ...ageingCards);
+      mount(grid, ageing);
+    }
+
+    // The trend and the sheet share the last row. Sales full-width blows the 340-wide chart up to
+    // ~650px tall; at half width it is the ~330px the original design was tuned for. The sheet
+    // stays readable at half — its two sides auto-fit and stack when they must. When a lone one of
+    // the two is present it fills the row, which is fine.
+    const bottomCards: HTMLElement[] = [];
+    if (cards?.salesTrend) bottomCards.push(renderTrend(cards.salesTrend, t, locale));
+    if (cards?.balanceSheet?.length) bottomCards.push(renderSheet(cards.balanceSheet, t));
+    if (bottomCards.length > 0) {
+      const bottom = el('div', 'grid-row pair');
+      mount(bottom, ...bottomCards);
+      mount(grid, bottom);
+    }
 
     // Desaturate the numbers when they are not current. The banner says it in words; this makes
     // it impossible to glance past.
@@ -337,107 +356,17 @@ export function mountDashboard(container: Element, options: DashboardOptions = {
 
     gridEl = grid;
     mount(content, grid);
-    layoutMasonry(grid);
   }
 
-  /**
-   * Give every card a row span equal to the height it actually wants.
-   *
-   * WHY THIS IS NOT CSS'S JOB (yet). A grid row is as tall as its tallest item, so Cash (~230px)
-   * sharing row 1 with Receivables (~500px: donut plus five debtors) sat at the top of a 500px
-   * row with ~270px of void beneath it. On the 1366×768 screen this product is actually used on,
-   * about 40% of the first screen was empty and Payables was below the fold. Nothing caught it:
-   * the tests render into a fake DOM that has no layout at all, so the first screenshot ever
-   * taken of this app was also the first evidence of it.
-   *
-   * `grid-template-rows: masonry` would do this natively and is Firefox-only; this app is
-   * Chromium. `columns:` masonry works everywhere but flows top-to-bottom-then-across, which
-   * would drop Cash, Profit and Receivables down one column instead of across the top where the
-   * eye lands — the card ORDER is the design (see paintContent), so that is not available
-   * either. Fine rows plus a computed span is the technique that survives both constraints.
-   *
-   * Setting `.style` from script is NOT blocked by our `style-src 'self'` CSP: that directive
-   * governs `<style>` elements and `style=""` attributes in parsed markup, not CSSOM writes.
-   * (Checked, because getting it wrong means a dashboard that silently refuses to lay out.)
+  /*
+   * (Masonry retired.) This file used to give every card a `grid-row-end` span computed from its
+   * measured height, via a ResizeObserver, because a grid row is as tall as its tallest item and a
+   * short card next to the tall Receivables card left a ~270px void. paintContent now groups cards
+   * into rows of like-height peers that share a height (`align-items: stretch`), so the void — and
+   * the ragged, patchy packing an owner reported as "not placed evenly" — is designed out rather
+   * than measured away. No layout JS, no observer loop warnings, and the balance sheet is free to
+   * grow when a group is expanded because nothing pins its height.
    */
-  function layoutMasonry(grid: HTMLElement): void {
-    /*
-     * LAYOUT IS AN ENHANCEMENT. THE NUMBERS ARE NOT.
-     *
-     * Everything below needs a real layout engine — `getComputedStyle`, `scrollHeight`,
-     * `ResizeObserver`. In Electron all three exist; but this function is one `paintContent`
-     * away from the code that puts an owner's cash balance on screen, and a dashboard that
-     * THROWS because a spacing helper is unavailable is immeasurably worse than one that is
-     * spaced by the CSS fallback (`.grid > * { grid-row-end: span 40 }`).
-     *
-     * This is not hypothetical politeness: the test suite renders into a fake DOM with no
-     * layout at all (test/dashboard.dom.ts), and without this guard six tests — including
-     * "STALE DATA IS NEVER SHOWN UNDER A GREEN CHECKMARK" — died on a missing global. The tests
-     * found the real requirement: measure if you can, render regardless.
-     */
-    if (typeof ResizeObserver !== 'function' || typeof window.getComputedStyle !== 'function') {
-      return;
-    }
-
-    // A CARD'S HEIGHT IS NOT FIXED AFTER THE FIRST PASS, so a one-shot measurement rots:
-    //   - the balance sheet builds its children ON OPEN (renderSheet, deliberately — a
-    //     distributor's chart of accounts is thousands of nodes), so expanding a group makes the
-    //     card taller than the span we just gave it and it would clip its own contents;
-    //   - the window resizes, and re-wrapping a 47-character party name changes a card's height
-    //     without changing anything we could hook;
-    //   - the language toggle swaps every string for Devanagari, which has a taller line box.
-    //
-    // ResizeObserver catches all three by watching the thing that actually changed, rather than
-    // by guessing at the events that might cause it. It is disconnected in destroy().
-    if (!ro) {
-      ro = new ResizeObserver(() => {
-        // Re-measure from the grid we are observing, not a captured one: paintContent builds a
-        // NEW grid element on every repaint.
-        if (gridEl) relayout(gridEl);
-      });
-    }
-    ro.disconnect();
-    for (const child of Array.from(grid.children)) ro.observe(child);
-    relayout(grid);
-  }
-
-  function relayout(grid: HTMLElement): void {
-    const styles = window.getComputedStyle(grid);
-    const row = parseFloat(styles.getPropertyValue('grid-auto-rows')) || 8;
-    const gap = parseFloat(styles.getPropertyValue('column-gap')) || 16;
-
-    for (const child of Array.from(grid.children)) {
-      const card = child as HTMLElement;
-      // `scrollHeight`, not `getBoundingClientRect().height`: the card's own height is already
-      // constrained by the span we are about to compute (or by the CSS fallback), so measuring
-      // the rendered box would just measure our own previous guess and converge on it. The
-      // scroll height is what the content wants regardless.
-      const wanted = card.scrollHeight;
-      // +gap so the span carries its own bottom margin — row-gap is 0 by necessity (an 8px row
-      // gap would appear between every one of the ~60 rows a card spans, not between cards).
-      const span = Math.max(1, Math.ceil((wanted + gap) / row));
-      const next = `span ${span}`;
-
-      // Write only on change. A cheap guard, and — HAVING MEASURED IT — NOT the thing that keeps
-      // this ResizeObserver from looping. I wrote a confident comment here claiming it was, then
-      // tested the claim by deleting the guard: the layout still converges and Chromium still
-      // logs zero "ResizeObserver loop completed with undelivered notifications". The comment was
-      // wrong, so it is gone. (Recording the correction rather than quietly deleting it, because
-      // the next person will have the same intuition I did.)
-      //
-      // WHAT ACTUALLY PREVENTS THE LOOP is `align-self: start` on `.card` (styles.css). It
-      // decouples a card's HEIGHT from its row span: the span reserves grid space, while the
-      // card's box stays exactly as tall as its content. So writing `gridRowEnd` does not resize
-      // the observed box, no notification is generated, and there is no cycle to break. Remove
-      // `align-self: start` and this genuinely would feed back — which is the real reason to
-      // leave both in place.
-      //
-      // Measured: spans settle to a fixed vector and are byte-identical 2s later, with and
-      // without this guard. The ~3.5k loop warnings the screenshot harness prints come from the
-      // harness resizing its own window to 4000px for the full-page capture, not from the app.
-      if (card.style.gridRowEnd !== next) card.style.gridRowEnd = next;
-    }
-  }
 
   function companyPicker(): HTMLElement {
     const wrap = el('div', 'companies');
@@ -534,11 +463,6 @@ export function mountDashboard(container: Element, options: DashboardOptions = {
       destroyed = true;
       clearInterval(ticker);
       unsubscribe?.();
-      // An observer that outlives its grid holds the whole detached tree alive and keeps
-      // re-laying-out nodes nobody can see. `clear(container)` drops the DOM but NOT the
-      // observation.
-      ro?.disconnect();
-      ro = undefined;
       clear(container);
     },
   };

@@ -36,6 +36,7 @@ const {
   ageingCard,
   balanceSheetTree,
   cashBankCard,
+  dutiesTaxesCard,
   profitCard,
   salesTrendCard,
   stockCard,
@@ -144,6 +145,17 @@ const groupRows = [
   { companyGuid: GUID, asOf: AS_OF, groupName: 'Sales', parent: '', primaryGroup: 'Sales Accounts', isRevenue: true, opening: '0.00', closing: '3800000.00' },
 ];
 
+// Duties & Taxes at ledger grain. NO flip, unlike cash/stock: GST payable is a LIABILITY (Cr,
+// POSITIVE here) and reads as money owed; Input Tax Credit is an asset (Dr, NEGATIVE) and reads
+// as money the tax office owes back. `dutiesTaxesCard` prints these signs verbatim, so feeding
+// them the other way round would invert the whole card — same open question as stock, tracked.
+const dutiesRows = [
+  { companyGuid: GUID, asOf: AS_OF, ledgerName: 'CGST Payable', parent: 'Duties & Taxes', closing: '410200.00' },
+  { companyGuid: GUID, asOf: AS_OF, ledgerName: 'SGST Payable', parent: 'Duties & Taxes', closing: '410200.00' },
+  { companyGuid: GUID, asOf: AS_OF, ledgerName: 'IGST Payable', parent: 'Duties & Taxes', closing: '180000.00' },
+  { companyGuid: GUID, asOf: AS_OF, ledgerName: 'Input Tax Credit (ITC)', parent: 'Duties & Taxes', closing: '-360800.00' },
+];
+
 const CARDS = {
   state: 'ready',
   incomplete: false,
@@ -153,6 +165,7 @@ const CARDS = {
       name: 'Acme Traders',
       asOf: AS_OF,
       cashBank: cashBankCard(cashRows),
+      dutiesTaxes: dutiesTaxesCard(dutiesRows),
       receivables: ageingCard(totalsFor('receivable'), rowsFor('receivable'), 'receivable'),
       payables: ageingCard(totalsFor('payable'), rowsFor('payable'), 'payable'),
       profit: profitCard(current, previous),

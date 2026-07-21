@@ -325,67 +325,36 @@ body::before {
 /* ---------------------------------------------------------------- grid */
 
 /*
- * THE GRID, AND WHY IT IS ROW-SPANNED RATHER THAN JUST `align-items: start`.
+ * THE GRID IS ROWS OF LIKE-HEIGHT PEERS, not a measured masonry.
  *
- * A CSS grid row is as tall as its tallest item. The Receivables card is a donut plus five
- * debtors (~500px); Cash and Profit are ~230px. They share row 1, so `align-items: start`
- * parked the short cards at the top of a 500px row and left ~270px of VOID under each. On the
- * 1366×768 screen this product is actually used on, roughly 40% of the first screen was empty
- * and Payables was pushed below the fold. That was invisible to every test — the fake DOM has
- * no layout — and obvious in the first screenshot ever taken (scripts/visual-harness.mjs).
- *
- * The fix is the standard masonry-in-grid technique: make the rows FINE (`--row: 8px`) and let
- * `layoutMasonry` in dashboard.ts give each card a `grid-row-end: span N` computed from the
- * height it actually wants. Cards then pack against each other instead of against the tallest
- * card in their row, and reading order is preserved — which rules out `columns:`, the other
- * masonry option, because it flows top-to-bottom-then-across and would put Cash, Profit and
- * Receivables in one column instead of across the top where the eye lands.
- *
- * `row-gap: 0` is deliberate and load-bearing: the gap between cards comes from the span maths
- * (`--row` + `--gap`) instead, because a row gap applied to 8px rows would multiply into the
- * space between every card. The column gap is unaffected.
- *
- * IF THE JS NEVER RUNS, this degrades to one row per card rather than to garbage — see the
- * fallback in `.grid > *` below.
+ * The board stacks rows; each row is its own auto-fit grid whose cards SHARE A HEIGHT
+ * (`align-items: stretch`). That shared height is what reads as "placed evenly" — the previous
+ * masonry packed tight but left ragged, patchy bottoms and a mix of one- and two-column cards
+ * that looked like a heap. `auto-fit` means a row of four tiles fills the width evenly and a row
+ * of one fills it too, so the layout stays tidy whether Tally returned every section or two of
+ * them. No JS measures anything; the balance sheet is free to grow when a group is expanded
+ * because nothing pins a card's height any more.
  */
 .grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  grid-auto-rows: var(--row);
-  column-gap: var(--gap);
-  row-gap: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
   padding: 20px;
-  align-items: start;
-  /*
-   * `dense` BACKFILLS THE HOLE A `.wide` CARD LEAVES, and at 1024×768 that hole was a third of
-   * the screen.
-   *
-   * At 1024px the grid resolves to THREE columns. Cash takes column 1, Profit column 2, and
-   * Receivables — `span 2` — no longer fits in the single remaining column, so it wraps to the
-   * next row. Column 3 is then stranded for the whole of row 1, and the default sparse algorithm
-   * never looks backwards to fill it. The result was a dead vertical strip down the right of a
-   * very common shop-laptop resolution, which the 1366px screenshot could not show because four
-   * columns happen to divide evenly.
-   *
-   * `dense` lets a LATER one-column card (Stock) move up into that gap. The cost is honest: it
-   * decouples visual order from DOM order, so a card can appear earlier than it was painted.
-   * That is acceptable HERE and would not be everywhere — the cards are peers answering separate
-   * questions, not a ranked list, and `paintContent`'s ordering is about what the eye meets
-   * first, which an empty third of the screen defeats far more thoroughly than a reflow does.
-   *
-   * Accessibility note, and the reason this is safe: DOM order is what a screen reader and the
-   * tab sequence follow, and `dense` does not touch it. Only the visual packing changes.
-   */
-  grid-auto-flow: row dense;
 }
 
-/*
- * The no-JS fallback. Until `layoutMasonry` sets a real span, a card would be ONE 8px row tall
- * and every card would overlap in a heap. `span 40` (~320px) is a plausible card, so a broken
- * or slow layout pass reads as slightly-wrong spacing rather than an unreadable pile.
- */
-.grid > * {
-  grid-row-end: span 40;
+.grid-row {
+  display: grid;
+  gap: var(--gap);
+  align-items: stretch;
+}
+/* The five-second tiles: cash, profit, stock, GST. Four fit a shop-PC width; they wrap and
+   re-even themselves as the window narrows, down to one per row. */
+.grid-row.tiles {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+/* The two ageing books, wide enough for the donut + bars + a debtor list side by side. */
+.grid-row.pair {
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
 }
 
 .card {
@@ -399,13 +368,9 @@ body::before {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  /*
-   * Tall cards (debtor lists) must not stretch their row-mates — AND this is load-bearing for the
-   * masonry ResizeObserver: `align-self: start` decouples a card's height from its row span, so
-   * writing `grid-row-end` never resizes the observed box and there is no relayout loop. See
-   * dashboard.ts `relayout`. Do not remove it for the sake of a stretch effect.
-   */
-  align-self: start;
+  /* Cards stretch to their row's shared height (`.grid-row { align-items: stretch }`) — that
+     equal height is the "placed evenly" the layout is built around, so NO `align-self: start`
+     here; it would opt a card back out of the stretch and reintroduce the ragged look. */
   backdrop-filter: blur(14px) saturate(130%);
   -webkit-backdrop-filter: blur(14px) saturate(130%);
   box-shadow: var(--shadow-card);
@@ -437,12 +402,12 @@ body::before {
   from { opacity: 0; transform: translateY(8px); }
 }
 
-.card.wide { grid-column: span 2; }
-.card.full { grid-column: 1 / -1; }
-
-@media (max-width: 760px) {
-  .card.wide { grid-column: span 1; }
-}
+/* `.wide` / `.full` are legacy width hints some render functions still set on their card. Under
+   the row-grouped layout the row decides width, so these are neutralised to `auto` — left as a
+   no-op rather than chased through every render function. A card in `.grid-row.pair` must NOT
+   `span 2`, or the even two-up ageing row collapses to one column. */
+.card.wide,
+.card.full { grid-column: auto; }
 
 /*
  * THE STALE TREATMENT.

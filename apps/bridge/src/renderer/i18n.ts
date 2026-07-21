@@ -51,6 +51,11 @@ const en = {
   'card.sales': 'Sales',
   'card.stock': 'Stock value',
   'card.sheet': 'Balance sheet',
+  'card.duties': 'GST & taxes',
+
+  'duties.net': 'Net GST payable',
+  'duties.credit': 'Net input credit — the tax office owes you',
+  'duties.empty': 'No Duties & Taxes ledgers found in Tally.',
 
   'cash.empty': 'No cash or bank ledgers found in Tally.',
   'cash.overdrawn': 'Your accounts are overdrawn.',
@@ -159,6 +164,11 @@ const hi: Partial<Record<StringKey, string>> = {
   'card.sales': 'बिक्री',
   'card.stock': 'स्टॉक मूल्य',
   'card.sheet': 'बैलेंस शीट',
+  'card.duties': 'GST और कर',
+
+  'duties.net': 'शुद्ध GST देय',
+  'duties.credit': 'शुद्ध इनपुट क्रेडिट — कर विभाग आपका बकाया है',
+  'duties.empty': 'Tally में कोई Duties & Taxes खाता नहीं मिला।',
 
   'cash.empty': 'Tally में कोई नकद या बैंक खाता नहीं मिला।',
   'cash.overdrawn': 'आपके खातों में शेष ऋणात्मक है।',
