@@ -1,89 +1,84 @@
 /*
- * The dashboard.
+ * The dashboard — FINANCIAL ARCHITECTURE.
+ *
+ * The visual language is the one the owner already loves on the web dashboard (apps/web/ui):
+ * a light-grey hairline grid showing through 1px gaps between flat white panels, tiny uppercase
+ * micro-headings, and HUGE thin numbers. The number IS the design; everything else is a hairline.
  *
  * Design constraints specific to this audience, not general taste:
  *
  *   - Numbers are the product. They get the largest type on the screen and they use tabular
  *     figures, so digits line up and do not jitter when a sync lands.
  *   - Tones are semantic (good/warn/bad/neutral) and are mapped to colour HERE and nowhere
- *     else. `packages/viewmodel` returns tones, never colours — that is what lets a future
- *     mobile surface pick its own palette without touching a line of logic.
+ *     else. `packages/viewmodel` returns tones, never colours.
  *   - Colour is never the only signal. Roughly one man in twelve is red/green colourblind, and
- *     this app is read almost entirely by men over forty-five. Every tone dot sits beside a
+ *     this app is read almost entirely by men over forty-five. Every tone mark sits beside a
  *     word, every chart beside its numbers.
  *   - No hover-only affordances. This gets glanced at, sometimes on a touchscreen POS terminal.
  *   - No remote fonts, no remote anything: the CSP forbids it and the app must paint identically
  *     on an offline shop PC.
  *
+ * COLOUR HAS EXACTLY TWO MEANINGS HERE, and both are quiet:
+ *   - GOLD (--accent) means THE PRESENT: the synced dot, the latest month's column, the active
+ *     company, the focus ring, the hairline over the hero panel. One accent, one meaning.
+ *   - OXIDE RED (--bad) means MONEY GONE WRONG: overdue, negative, loss. Nothing else is red.
+ *   Everything else is ink at some opacity. good/neutral read as calm ink — good news does not
+ *   need a colour, it needs a legible number.
+ *
  * Motion is calm and short, and all of it is off under prefers-reduced-motion — see the bottom
- * of the file. Nothing here animates a NUMBER: a figure that counts up is a figure you cannot
- * read for the second it is wrong.
+ * of the file. Nothing here animates a NUMBER.
  */
 
-/*
- * ROYAL MINIMALIST TECH — obsidian ground, frosted-glass cards, a champagne-gold accent
- * used with restraint. The palette is TOKENS ONLY; every component reads through them, so the
- * light "pristine white" world below is a token swap, not a second stylesheet. Semantic tones
- * (good/warn/bad) are deliberately NOT the accent — the accent is chrome, the tones are meaning.
- */
 :root {
-  --bg: #070a0f;            /* obsidian, faint blue bias */
-  --bg-elev: #0b0f16;
-  /* Cards are GLASS: translucent white over the obsidian ground + backdrop-blur. `--card-solid`
-     is the one opaque surface (the unlock modal, which sits over a scrim and must not show it). */
-  --card: rgba(255, 255, 255, 0.045);
-  --card-hover: rgba(255, 255, 255, 0.08);
-  --card-solid: #0e141d;
-  /* Metallic hairline: a cool near-white at low alpha reads as brushed edge, not a drawn line. */
-  --border: rgba(210, 225, 255, 0.12);
-  --border-strong: rgba(210, 225, 255, 0.22);
-  --text: #eaf0f7;
-  --muted: #8a98ac;
-  --faint: #5a6678;
+  /* The hairline ground. Panels sit on this with 1px gaps; the grey showing through IS the grid. */
+  --bg: #e3e1dc;
+  --bg-elev: #f6f5f2;
+  --card: #ffffff;
+  --card-hover: #fbfaf8;
+  --card-solid: #ffffff;
+  /* Hairlines INSIDE a panel are one step lighter than the grid between panels. */
+  --border: #ebe9e4;
+  --border-strong: #c9c6bf;
+  --text: #171512;
+  --muted: #6f6b64;
+  --faint: #a3a099;
 
-  --good: #46d9a0;
-  --warn: #f5c24b;
-  --bad: #fb6b6b;
-  --neutral: #6aa6ff;
-  --accent: #c9a96a;        /* champagne — the "royal". Focus rings, primary CTA, the live column. */
-  --accent-2: #e7d3a1;
+  /* Semantic tones. Only --bad is a colour; good/neutral are calm ink, warn is deep gold. */
+  --good: #55524b;
+  --warn: #8a6d2f;
+  --bad: #b23c33;
+  --neutral: #7d7a73;
+  /* The one accent: muted gold. Means "the present" — see the header comment. */
+  --accent: #a08339;
+  --accent-2: #c2a35c;
 
-  --radius: 16px;
-  --gap: 16px;
-  /* The masonry row unit. Finer = tighter packing, more spans to compute. 8px is well under
-     any real card's height granularity, so the quantisation is invisible. */
-  --row: 8px;
+  --radius: 0px;
+  --gap: 1px;
 
-  --glow-gold: 0 0 0 1px rgba(201, 169, 106, 0.22), 0 18px 50px -24px rgba(201, 169, 106, 0.4);
-  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 22px 55px -34px rgba(0, 0, 0, 0.9);
-
-  color-scheme: dark;
+  color-scheme: light;
 }
 
-@media (prefers-color-scheme: light) {
+@media (prefers-color-scheme: dark) {
   :root {
-    --bg: #edf1f6;
-    --bg-elev: #f6f8fb;
-    --card: rgba(255, 255, 255, 0.72);
-    --card-hover: rgba(255, 255, 255, 0.95);
-    --card-solid: #ffffff;
-    --border: rgba(20, 35, 70, 0.12);
-    --border-strong: rgba(20, 35, 70, 0.22);
-    --text: #0c1220;
-    --muted: #5a6884;
-    --faint: #8a96ac;
+    --bg: #2b2a26;
+    --bg-elev: #1c1b18;
+    --card: #151412;
+    --card-hover: #1b1a17;
+    --card-solid: #1c1b18;
+    --border: #26251f;
+    --border-strong: #45433c;
+    --text: #edeae3;
+    --muted: #98948b;
+    --faint: #6b6862;
 
-    --good: #12946a;
-    --warn: #b6820c;
-    --bad: #d2413f;
-    --neutral: #2c6fd6;
-    --accent: #9a7b34;
-    --accent-2: #b8923f;
+    --good: #b5b1a8;
+    --warn: #c8a75d;
+    --bad: #e06a5e;
+    --neutral: #8a867e;
+    --accent: #c8a75d;
+    --accent-2: #e0c98d;
 
-    --glow-gold: 0 0 0 1px rgba(154, 123, 52, 0.22), 0 18px 50px -26px rgba(154, 123, 52, 0.35);
-    --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 22px 48px -34px rgba(30, 45, 90, 0.35);
-
-    color-scheme: light;
+    color-scheme: dark;
   }
 }
 
@@ -97,44 +92,16 @@ body {
   background: var(--bg);
   color: var(--text);
   /*
-   * System fonts only. Not a compromise: the CSP has no remote origins, and the system stack is
-   * also the only one on a Windows shop PC guaranteed to have Devanagari — a webfont that ships
-   * Latin glyphs only turns every Hindi string into tofu boxes.
+   * Helvetica Neue where it exists (macOS), Segoe UI on the Windows shop PC — both carry the
+   * thin weights the hero number needs, and the system stack is the only one guaranteed to have
+   * Devanagari. No webfonts: the CSP has no remote origins.
    */
-  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  font: 14px/1.5 "Helvetica Neue", "Segoe UI", system-ui, -apple-system, Roboto, "Noto Sans", sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow-y: auto;
   /* The page must NEVER scroll sideways. On a Windows shop PC at 150% display scaling the app
-     sees ~850 effective CSS px, and a card that cannot shrink otherwise pushes its number off the
-     right edge — the "numbers a bit off the screen" an owner reported. This clamps the failure so
-     it can never present as content vanishing past the frame; `min-width: 0` on the cards below is
-     what actually lets them shrink instead. */
+     sees ~850 effective CSS px; `min-width: 0` on the cards below is what lets them shrink. */
   overflow-x: hidden;
-}
-
-/*
- * Ambient light — two soft pools that give the obsidian ground depth and let the frosted cards
- * read as glass sitting ABOVE something. Pure CSS, fixed, non-interactive, and cheap: a couple of
- * radial gradients, no blur, no repaint. The whole "spatial 3D" impression is this plus the
- * per-card backdrop-blur and metallic edge — no WebGL, no images, nothing the CSP forbids.
- */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(1100px 680px at 82% -12%, rgba(201, 169, 106, 0.10), transparent 60%),
-    radial-gradient(900px 760px at -6% 10%, rgba(106, 166, 255, 0.08), transparent 55%),
-    radial-gradient(1200px 900px at 50% 118%, rgba(70, 217, 160, 0.05), transparent 60%);
-}
-@media (prefers-color-scheme: light) {
-  body::before {
-    background:
-      radial-gradient(1000px 620px at 82% -14%, rgba(184, 146, 63, 0.14), transparent 60%),
-      radial-gradient(880px 720px at -6% 8%, rgba(44, 111, 214, 0.09), transparent 55%);
-  }
 }
 
 .boot {
@@ -142,16 +109,55 @@ body::before {
   place-items: center;
   height: 100vh;
   color: var(--muted);
+  background: var(--card);
+}
+
+.dashboard {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.dash-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The tiny uppercase label — the signature micro-heading of the architecture. */
+.card-title,
+.card-subtitle,
+.sheet-side-title,
+.donut-center-bottom,
+.bar-label,
+.stock-name {
+  font-size: 0.66rem;
+  font-weight: 650;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Uppercasing is a Latin habit. Devanagari has no case, and `text-transform` on it is a no-op
+   at best; the letter-spacing, however, breaks its conjuncts apart. Turn both off. */
+:root[lang="hi"] .card-title,
+:root[lang="hi"] .card-subtitle,
+:root[lang="hi"] .sheet-side-title,
+:root[lang="hi"] .donut-center-bottom,
+:root[lang="hi"] .bar-label,
+:root[lang="hi"] .stock-name,
+:root[lang="hi"] .chip,
+:root[lang="hi"] .status-action.primary {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.8rem;
 }
 
 /* ---------------------------------------------------------------- sync strip */
 
 /*
- * ALWAYS VISIBLE, never behind a menu.
- *
- * The owner must be able to tell at a glance whether the numbers are current. A dashboard
- * silently showing week-old figures is worse than one that admits it is broken, and this strip
- * plus the `.stale` treatment below is the whole of that promise.
+ * ALWAYS VISIBLE, never behind a menu. The owner must be able to tell at a glance whether the
+ * numbers are current. A flat white bar over a hairline — no glass, no blur.
  */
 .statusbar,
 .sync-strip {
@@ -161,27 +167,21 @@ body::before {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 15px 24px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--bg) 82%, transparent),
-    color-mix(in srgb, var(--bg) 42%, transparent)
-  );
-  backdrop-filter: blur(20px) saturate(140%);
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
-  border-bottom: 1px solid var(--border);
+  padding: 14px clamp(16px, 2.4vw, 32px);
+  background: var(--card);
+  border-bottom: 1px solid var(--bg);
 }
 
 .dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  width: 7px;
+  height: 7px;
   flex: none;
 }
-.dot.ok { background: var(--good); }
-.dot.waiting { background: var(--warn); }
+/* Gold = current — the one accent, meaning "the present". */
+.dot.ok { background: var(--accent); }
+.dot.waiting { background: var(--muted); }
 .dot.error { background: var(--bad); }
-.dot.never { background: var(--muted); }
+.dot.never { background: var(--faint); }
 
 /* A slow, quiet pulse while Tally is closed. Never on the error state: a red dot that throbs
    reads as an emergency, and Tally being shut on a Sunday is not one. */
@@ -195,6 +195,7 @@ body::before {
 
 .status-text {
   color: var(--muted);
+  font-size: 13px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -211,38 +212,38 @@ body::before {
 }
 
 .status-action {
-  padding: 8px 16px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--card);
+  padding: 9px 16px;
+  border: 1px solid var(--border-strong);
+  background: transparent;
   color: var(--text);
   font: inherit;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  transition: transform 180ms cubic-bezier(0.22, 0.61, 0.36, 1), border-color 180ms, background 180ms;
+  transition: background 160ms ease-out, border-color 160ms ease-out;
 }
-.status-action:hover { background: var(--card-hover); border-color: var(--border-strong); transform: translateY(-1px); }
-.status-action:disabled { opacity: 0.6; cursor: default; transform: none; }
+.status-action:hover { background: var(--card-hover); border-color: var(--text); }
+.status-action:disabled { opacity: 0.55; cursor: default; }
 .status-action.primary { margin-left: auto; }
 
 /*
- * The one gold moment. The primary action (Sync now / Open Tally) is the single champagne fill on
- * the screen; everything else stays quiet glass so this reads as THE thing to press. Dark ink on
- * gold, not white, for contrast on both themes.
+ * The primary action is an INK BLOCK — the only solid rectangle on the screen, so it reads as
+ * THE thing to press. Uppercase micro-type, like the web dashboard's submit.
  */
 .status-action.primary {
-  border-color: transparent;
-  background: linear-gradient(180deg, var(--accent-2), var(--accent));
-  color: #12100b;
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--card);
+  font-size: 11px;
   font-weight: 650;
-  box-shadow: 0 6px 18px -8px rgba(201, 169, 106, 0.7);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 11px 20px;
 }
 .status-action.primary:hover {
-  background: linear-gradient(180deg, var(--accent-2), var(--accent));
-  filter: brightness(1.06);
+  background: var(--text);
+  opacity: 0.85;
 }
 
 /* A visible focus ring on everything. This app is used by people who never touch a trackpad. */
@@ -253,15 +254,13 @@ body::before {
 .tree-toggle:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: 8px;
 }
 
 /* ---------------------------------------------------------------- language */
 
 .lang {
   display: flex;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: 1px solid var(--border-strong);
   overflow: hidden;
   flex: none;
   margin-left: auto;
@@ -270,7 +269,7 @@ body::before {
 .lang + .status-action.primary { margin-left: 0; }
 
 .lang-option {
-  padding: 5px 10px;
+  padding: 6px 12px;
   border: 0;
   background: transparent;
   color: var(--muted);
@@ -279,24 +278,35 @@ body::before {
   cursor: pointer;
 }
 .lang-option:hover { background: var(--card-hover); }
-.lang-option.on { background: var(--card); color: var(--text); font-weight: 600; }
+.lang-option.on { background: var(--text); color: var(--card); font-weight: 600; }
 
 /* ---------------------------------------------------------------- banners */
 
 .banners { display: flex; flex-direction: column; }
 
 .banner {
-  padding: 10px 20px;
-  font-size: 13px;
-  border-bottom: 1px solid var(--border);
+  padding: 10px clamp(16px, 2.4vw, 32px);
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+  background: var(--card);
+  border-bottom: 1px solid var(--bg);
+  color: var(--muted);
 }
+/*
+ * THE STALE / PARTIAL STATES ARE A SENTENCE, NOT A FILTER.
+ *
+ * This used to be `.grid.stale { filter: saturate(.55); opacity: .88 }` on the whole board, and
+ * on the owner's screen it read as "the app is broken", not "the numbers are old". These ARE the
+ * owner's real numbers as of some earlier point; greying all of them out is its own kind of lie.
+ * So staleness is stated here in words, beside a thin marker — and the numbers stay ink.
+ */
 .banner.warn {
-  background: color-mix(in srgb, var(--warn) 14%, transparent);
-  color: color-mix(in srgb, var(--warn) 70%, var(--text));
+  color: var(--warn);
+  box-shadow: inset 3px 0 0 var(--warn);
 }
 .banner.bad {
-  background: color-mix(in srgb, var(--bad) 14%, transparent);
-  color: color-mix(in srgb, var(--bad) 70%, var(--text));
+  color: var(--bad);
+  box-shadow: inset 3px 0 0 var(--bad);
 }
 
 /* ---------------------------------------------------------------- companies */
@@ -304,14 +314,18 @@ body::before {
 .companies {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  padding: 16px 20px 0;
+  gap: 4px 22px;
+  padding: 12px clamp(16px, 2.4vw, 32px) 0;
+  background: var(--card);
+  border-bottom: 1px solid var(--bg);
 }
 
+/* Company tabs, like the web dashboard's year timeline: quiet text, a hairline under the
+   active one. Gold underline = the present selection. */
 .company {
-  padding: 5px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
+  padding: 6px 2px 10px;
+  border: 0;
+  border-bottom: 2px solid transparent;
   background: transparent;
   color: var(--muted);
   font: inherit;
@@ -322,198 +336,128 @@ body::before {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.company:hover { color: var(--text); }
 .company.on {
-  background: var(--card);
   color: var(--text);
-  border-color: color-mix(in srgb, var(--accent) 60%, var(--border));
+  font-weight: 600;
+  border-bottom-color: var(--accent);
 }
 
 /* ---------------------------------------------------------------- grid */
 
 /*
- * THE GRID IS ROWS OF LIKE-HEIGHT PEERS, not a measured masonry.
+ * THE BENTO. Rows of panels separated by 1px gaps; the page ground (--bg) showing through the
+ * gaps draws the entire grid — no borders, no shadows, no radii. Within a row the panels share
+ * a height (grid's default stretch), so every hairline runs unbroken across the screen.
  *
- * The board stacks rows; each row is its own auto-fit grid whose cards SHARE A HEIGHT
- * (`align-items: stretch`). That shared height is what reads as "placed evenly" — the previous
- * masonry packed tight but left ragged, patchy bottoms and a mix of one- and two-column cards
- * that looked like a heap. `auto-fit` means a row of four tiles fills the width evenly and a row
- * of one fills it too, so the layout stays tidy whether Tally returned every section or two of
- * them. No JS measures anything; the balance sheet is free to grow when a group is expanded
- * because nothing pins a card's height any more.
+ * Row shapes (assigned by paintContent in dashboard.ts):
+ *   .lede — the hero: Cash & Bank at 2fr beside Profit at 1fr.
+ *   .pair — the two ageing books, side by side.
+ *   .trio — Sales trend, Stock, GST.
+ *   .solo — the balance sheet, full width.
+ * `auto-fit` on pair/trio means a missing card never leaves a grey void — the rest widen.
+ * `:only-child` spans the lede for the same reason.
  */
 .grid {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: var(--gap);
-  padding: 20px;
+  gap: 1px;
+  background: var(--bg);
 }
 
 .grid-row {
   display: grid;
-  gap: var(--gap);
-  /* Cards HUG their content (`start`), not stretch to a shared height. Because each row groups
-     cards of similar height (the tiles together, the two ageing books together), the result is a
-     small natural stagger rather than the big empty voids a stretch left under the sparser cards —
-     which an owner read as "poor / sparse". The rows still align at the TOP, which is what carries
-     the "even" reading; only the bottoms differ, by the amount their content actually differs. */
-  align-items: start;
+  gap: 1px;
 }
-/* The five-second tiles: cash, profit, stock, GST. DETERMINISTIC columns, not auto-fit — auto-fit
-   was picking 3 columns at a shop-PC width and stranding the fourth tile beside a wide void. Four
-   across on a wide screen; a clean 2x2 once the window (or 150% display scaling) drops it below
-   ~1160px; one per row on a phone-width. `minmax(0, 1fr)` lets every column shrink so a big number
-   never pushes the row wider than the frame. */
-.grid-row.tiles {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  /* The KPI tiles are EQUAL height — the standard, tidy dashboard look, and what reads as "even".
-     A shorter tile (Stock with two groups) gets a little breathing room at the bottom rather than
-     leaving a dark grid-cell hole beneath it, which is what top-alignment did. The ageing pair and
-     the sales/sheet row keep the row default (start): those cards differ enough that stretching
-     the shorter one would waste real space. */
-  align-items: stretch;
-}
-/* The two ageing books, side by side, wide enough for the donut + bars + a debtor list. */
-.grid-row.pair {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-@media (max-width: 1160px) {
-  .grid-row.tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@media (max-width: 680px) {
-  .grid-row.tiles,
-  .grid-row.pair { grid-template-columns: 1fr; }
-}
-/* Grid items refuse to shrink below their content (`min-width: auto`) — the same overflow trap as
-   the cards. Force every row child to shrink so nothing runs off the frame at 150% scaling. */
+/* Grid items refuse to shrink below their content (`min-width: auto`) — the classic overflow
+   trap. Force every row child to shrink so nothing runs off the frame at 150% scaling. */
 .grid-row > * { min-width: 0; }
+.grid-row > :only-child { grid-column: 1 / -1; }
 
-.card {
-  position: relative;
-  /* A grid/flex item defaults to `min-width: auto`, which REFUSES to shrink below its content —
-     so a wide number or a fixed-column bar row makes the card overflow its track and run off the
-     right of the window. `min-width: 0` lets the card shrink and the ellipsis/wrapping inside do
-     their job. This is the actual fix for numbers running off the screen. */
-  min-width: 0;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 46%),
-    var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  /* Cards stretch to their row's shared height (`.grid-row { align-items: stretch }`) — that
-     equal height is the "placed evenly" the layout is built around, so NO `align-self: start`
-     here; it would opt a card back out of the stretch and reintroduce the ragged look. */
-  backdrop-filter: blur(14px) saturate(130%);
-  -webkit-backdrop-filter: blur(14px) saturate(130%);
-  box-shadow: var(--shadow-card);
-  overflow: hidden;
-  transition: transform 400ms cubic-bezier(0.22, 0.61, 0.36, 1), border-color 400ms, box-shadow 400ms;
-  animation: rise 320ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+.grid-row.lede { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+.grid-row.pair { grid-template-columns: repeat(auto-fit, minmax(min(330px, 100%), 1fr)); }
+.grid-row.trio { grid-template-columns: repeat(auto-fit, minmax(min(238px, 100%), 1fr)); }
+.grid-row.solo { grid-template-columns: minmax(0, 1fr); }
+
+@media (max-width: 720px) {
+  .grid-row.lede { grid-template-columns: 1fr; }
 }
 
-/* Brushed-metal top edge: a 1px highlight that catches the ambient light like a bevel. */
-.card::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--border-strong), transparent);
-}
-
-/*
- * The lift. `transform` is safe under the masonry observer — it does not change the content-box
- * size ResizeObserver watches, so no span recompute is triggered on hover.
- */
-.card:hover {
-  transform: translateY(-3px);
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-card), var(--glow-gold);
-}
-
-@keyframes rise {
-  from { opacity: 0; transform: translateY(8px); }
-}
-
-/* `.wide` / `.full` are legacy width hints some render functions still set on their card. Under
-   the row-grouped layout the row decides width, so these are neutralised to `auto` — left as a
-   no-op rather than chased through every render function. A card in `.grid-row.pair` must NOT
-   `span 2`, or the even two-up ageing row collapses to one column. */
+/* Legacy width hints some render functions still set. The row decides width now. */
 .card.wide,
 .card.full { grid-column: auto; }
 
-/*
- * THE STALE TREATMENT.
- *
- * When the last sync did not succeed, the numbers on screen are from an earlier one. The banner
- * says so in a sentence; this makes it impossible to glance past. Deliberately restrained —
- * still perfectly readable, because these ARE the owner's real numbers as of some earlier point
- * and hiding them would be its own kind of lie.
- */
-.grid.stale .card {
-  filter: saturate(0.55);
-  opacity: 0.88;
+.card {
+  position: relative;
+  min-width: 0;
+  background: var(--card);
+  padding: clamp(18px, 2.4vw, 34px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+  transition: background 200ms ease-out;
+  animation: rise 280ms ease-out both;
+}
+.card:hover { background: var(--card-hover); }
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
 }
 
-.card-title {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+/* The signature: a single gold hairline over the hero panel — the money you have right now. */
+.card.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 20%, transparent));
 }
 
-/* Uppercasing is a Latin habit. Devanagari has no case, and `text-transform` on it is a no-op
-   at best; the letter-spacing, however, breaks its conjuncts apart. Turn both off. */
-:root[lang="hi"] .card-title,
-:root[lang="hi"] .card-subtitle {
-  text-transform: none;
-  letter-spacing: 0;
-  font-size: 13px;
-}
+/* (Intentionally no `.grid.stale` visual rule — the class stays on the element as a hook and a
+   test surface, but staleness is carried by the banner sentence and the strip's dot, never by
+   dimming the owner's numbers. See the banner comment above.) */
 
 .card-subtitle {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   margin-top: 4px;
-  padding-top: 10px;
+  padding-top: 12px;
   border-top: 1px solid var(--border);
 }
 
 /*
- * The headline number.
+ * The headline number — the signature of the whole design. Thin, huge, tight.
  *
  * tabular-nums is not cosmetic: without it digits have different widths and the number visibly
- * jitters every time a sync lands, which reads as instability in a number the owner is deciding
- * on.
+ * jitters every time a sync lands. FLUID clamp so it never outgrows a narrow or display-scaled
+ * card: the number stays on one line and inside its panel at ~850 effective px.
  */
 .big {
-  /* FLUID so the headline never outgrows a narrow or display-scaled card. At a shop-PC width it
-     sits near 31px; on the ~850px effective viewport of a 150%-scaled screen it eases down to
-     ~29px, and narrower still it keeps shrinking — the number stays on one line and inside its
-     card instead of running off the frame. */
-  font-size: clamp(1.5rem, 1.05rem + 1.8vw, 2.2rem);
-  font-weight: 700;
-  letter-spacing: -0.025em;
+  font-size: clamp(1.7rem, 1rem + 2.1vw, 3rem);
+  font-weight: 300;
+  letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
-  line-height: 1.1;
-  /* A rupee figure has no spaces to break on, so it stays one line; this just guarantees it. */
+  line-height: 1.05;
   white-space: nowrap;
 }
 
-.big.good { color: var(--good); }
-.big.bad { color: var(--bad); }
-.big.warn { color: var(--warn); }
+/* The hero's number is the biggest thing on the screen — that is the design. */
+.card.hero .big {
+  font-size: clamp(2.9rem, 1.4rem + 4.6vw, 5.5rem);
+  font-weight: 200;
+  letter-spacing: -0.05em;
+  line-height: 0.95;
+}
+
+/* Good news does not need a colour; it needs a legible number. Only losses go red. */
+.big.good { color: var(--text); }
 .big.neutral { color: var(--text); }
+.big.warn { color: var(--warn); }
+.big.bad { color: var(--bad); }
 
 .sub { color: var(--muted); font-size: 13px; }
-.sub.is-overdue { color: var(--warn); }
+.sub.is-overdue { color: var(--bad); }
 
 .card-empty {
   color: var(--faint);
@@ -528,24 +472,35 @@ body::before {
 }
 
 .delta { font-weight: 600; }
-.delta.up { color: var(--good); }
+.delta.up { color: var(--text); }
 .delta.down { color: var(--bad); }
 .delta.flat { color: var(--muted); }
 .delta-vs { color: var(--muted); }
 
 /* ---------------------------------------------------------------- rows */
 
-.rows { display: flex; flex-direction: column; gap: 8px; }
+.rows { display: flex; flex-direction: column; gap: 0; }
+
+/* A card's trailing list sits on the panel floor, like the web dashboard's sub-metric grids —
+   the air opens up between headline and detail, not below the detail. Cards in a row share a
+   height, so without this a short card reads top-heavy over a void. */
+.card > .rows:last-child,
+.card > .stock-rows:last-child { margin-top: auto; }
 
 .row {
   display: flex;
   align-items: baseline;
   gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
   font-variant-numeric: tabular-nums;
+  font-size: 13px;
 }
+.row:last-child { border-bottom: 0; }
 
 .row-name {
   flex: 1;
+  color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -554,131 +509,160 @@ body::before {
   min-width: 0;
 }
 
-.row-name.others { color: var(--muted); font-style: italic; }
+.row-name.others { font-style: italic; }
 
-.row-value { font-weight: 600; white-space: nowrap; }
+.row-value { font-weight: 500; white-space: nowrap; color: var(--text); }
 
 .link-button {
   align-self: flex-start;
-  padding: 4px 0;
+  padding: 6px 0 2px;
   border: 0;
   background: none;
-  color: var(--neutral);
+  color: var(--muted);
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
   cursor: pointer;
 }
-.link-button:hover { text-decoration: underline; }
+.link-button:hover { color: var(--text); }
 
 .chip {
-  font-size: 11px;
-  padding: 1px 7px;
-  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 7px;
   border: 1px solid currentColor;
-  opacity: 0.85;
   white-space: nowrap;
   flex: none;
+  align-self: center;
 }
-.chip.good { color: var(--good); }
+.chip.good { color: var(--muted); }
 .chip.warn { color: var(--warn); }
 .chip.bad { color: var(--bad); }
 .chip.neutral { color: var(--muted); }
 
+/* Tone marks: an ink ramp, dark = urgent. Only "bad" is a colour. A word always sits beside. */
 .tone-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
+  width: 7px;
+  height: 7px;
   flex: none;
 }
-.tone-dot.good { background: var(--good); }
-.tone-dot.warn { background: var(--warn); }
+.tone-dot.good { background: color-mix(in srgb, var(--text) 22%, transparent); }
+.tone-dot.warn { background: color-mix(in srgb, var(--text) 55%, transparent); }
 .tone-dot.bad { background: var(--bad); }
-.tone-dot.neutral { background: var(--neutral); }
+.tone-dot.neutral { background: color-mix(in srgb, var(--text) 35%, transparent); }
 
 .swatch {
-  width: 6px;
-  height: 14px;
-  border-radius: 2px;
+  width: 7px;
+  height: 7px;
   flex: none;
   align-self: center;
 }
-.swatch.cash { background: var(--good); }
-.swatch.bank { background: var(--neutral); }
+.swatch.cash { background: var(--text); }
+.swatch.bank { background: color-mix(in srgb, var(--text) 35%, transparent); }
 
 /* ---------------------------------------------------------------- cash composition */
 
+/* The segmented bar, straight from the web dashboard: thin ink segments over the hairline,
+   opacity carrying the ramp. */
 .stack {
   display: flex;
-  height: 10px;
-  border-radius: 999px;
+  height: 4px;
   overflow: hidden;
-  background: var(--border);
   gap: 2px;
+  margin-top: 4px;
 }
 
 .stack-seg {
   width: var(--w);
   min-width: 2px;
-  transition: width 300ms ease-out;
+  transition: width 500ms ease-out;
 }
-.stack-seg.cash { background: var(--good); }
-.stack-seg.bank { background: var(--neutral); }
-/* Alternate the bank segments so eight accounts are eight bands, not one blue bar. */
-.stack-seg.bank:nth-child(even) { background: color-mix(in srgb, var(--neutral) 62%, var(--card)); }
+.stack-seg.cash { background: var(--text); }
+.stack-seg.bank { background: color-mix(in srgb, var(--text) 45%, transparent); }
+/* Alternate the bank segments so eight accounts are eight bands, not one grey bar. */
+.stack-seg.bank:nth-child(even) { background: color-mix(in srgb, var(--text) 22%, transparent); }
 
 /* ---------------------------------------------------------------- bars */
 
 /*
- * The ageing bars.
- *
- * They sit beside the donut rather than instead of it, and that is not indecision: the ring
- * answers "what proportion of what I am owed has gone bad" and the bars answer "how much, and
- * how late". The owner asks both in one glance, and bars win magnitude comparisons that rings
- * lose.
+ * The ageing bars. They sit beside the ring rather than instead of it: the ring answers "what
+ * proportion of what I am owed has gone bad" and the bars answer "how much, and how late".
+ * Monochrome ink ramp — light is fine, dark is watch, red is chase.
  */
-.bars { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.bars { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
 
 .bar-row {
   display: grid;
-  grid-template-columns: 8px 84px minmax(0, 1fr) auto;
+  grid-template-columns: 7px minmax(56px, 86px) minmax(24px, 1fr) auto;
   gap: 10px;
   align-items: center;
 }
 
 .bar-label {
-  color: var(--muted);
-  font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .bar-track {
-  height: 8px;
-  background: color-mix(in srgb, var(--border) 70%, transparent);
-  border-radius: 999px;
+  height: 3px;
+  background: color-mix(in srgb, var(--border-strong) 45%, transparent);
   overflow: hidden;
 }
 
 .bar-fill {
   height: 100%;
   width: var(--w);
-  border-radius: 999px;
-  transition: width 300ms ease-out;
+  transition: width 500ms ease-out;
 }
-.bar-fill.good { background: var(--good); }
-.bar-fill.warn { background: var(--warn); }
+.bar-fill.good { background: color-mix(in srgb, var(--text) 25%, transparent); }
+.bar-fill.warn { background: color-mix(in srgb, var(--text) 58%, transparent); }
 .bar-fill.bad { background: var(--bad); }
-.bar-fill.neutral { background: var(--neutral); }
+.bar-fill.neutral { background: color-mix(in srgb, var(--text) 45%, transparent); }
 
-.bar-value { font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bar-value { font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ---------------------------------------------------------------- stock rows */
+
+/*
+ * Stock groups: name over a hairline fill, value pinned right. The old four-column bar grid
+ * squeezed long group names against their values at narrow widths — this two-line shape means a
+ * name can only ever truncate, never collide with the number.
+ */
+.stock-rows { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+
+.stock-row { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+
+.stock-row-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.stock-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stock-val {
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 
 /* ---------------------------------------------------------------- donut */
 
 .ageing-body {
   display: grid;
-  grid-template-columns: 132px minmax(0, 1fr);
-  gap: 18px;
+  grid-template-columns: 124px minmax(0, 1fr);
+  gap: clamp(14px, 2vw, 26px);
   align-items: center;
   padding: 4px 0;
 }
@@ -690,8 +674,8 @@ body::before {
 
 .donut-wrap {
   position: relative;
-  width: 132px;
-  height: 132px;
+  width: 124px;
+  height: 124px;
 }
 
 .donut {
@@ -702,21 +686,22 @@ body::before {
 
 .donut-track {
   fill: none;
-  stroke: color-mix(in srgb, var(--border) 70%, transparent);
+  stroke: color-mix(in srgb, var(--border-strong) 40%, transparent);
 }
 
+/* A thin architectural ring: ink at an opacity ramp, dark = urgent, red = the money to chase.
+   Same ramp as the bars beside it, so ring and bars read as one instrument. */
 .donut-slice {
   fill: none;
+  stroke: var(--text);
   stroke-linecap: butt;
-  /* The ring draws itself once, in a third of a second. The slices are already in place; only
-     the dash offset moves, so nothing about the picture is ever momentarily wrong. */
   animation: sweep 340ms ease-out both;
   transform-origin: 50% 50%;
 }
-.donut-slice.good { stroke: var(--good); }
-.donut-slice.warn { stroke: var(--warn); }
-.donut-slice.bad { stroke: var(--bad); }
-.donut-slice.neutral { stroke: var(--neutral); }
+.donut-slice.good { opacity: 0.18; }
+.donut-slice.warn { opacity: 0.5; }
+.donut-slice.bad { stroke: var(--bad); opacity: 0.92; }
+.donut-slice.neutral { opacity: 0.32; }
 
 @keyframes sweep {
   from { opacity: 0; transform: rotate(-12deg) scale(0.94); }
@@ -732,19 +717,13 @@ body::before {
 }
 
 .donut-center-top {
-  font-size: 19px;
-  font-weight: 650;
+  font-size: 20px;
+  font-weight: 300;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
 }
 
-.donut-center-bottom {
-  font-size: 11px;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-:root[lang="hi"] .donut-center-bottom { text-transform: none; letter-spacing: 0; }
+.donut-center-bottom { font-size: 0.58rem; }
 
 /* ---------------------------------------------------------------- columns */
 
@@ -752,58 +731,50 @@ body::before {
   width: 100%;
   height: auto;
   display: block;
-  margin-top: 4px;
+  margin-top: auto;
   overflow: visible;
 }
 
+/* Monochrome columns; the latest month is gold — the present, the one they came for. */
 .column {
-  fill: var(--neutral);
-  opacity: 0.5;
+  fill: var(--text);
+  opacity: 0.16;
   transition: opacity 160ms ease-out;
 }
 .column.accent { fill: var(--accent); opacity: 1; }
-.column.negative { fill: var(--bad); opacity: 0.75; }
-.columns:hover .column { opacity: 0.8; }
-.columns:hover .column.accent { opacity: 1; }
+.column.negative { fill: var(--bad); opacity: 0.8; }
+.columns:hover .column { opacity: 0.3; }
+.columns:hover .column.accent,
+.columns:hover .column.negative { opacity: 1; }
 
 .column-label {
   fill: var(--faint);
-  font-size: 9px;
+  font-size: 8.5px;
+  letter-spacing: 0.06em;
   font-family: inherit;
 }
 .column-label.accent { fill: var(--text); font-weight: 600; }
 
 .zero-line {
-  stroke: var(--border);
+  stroke: var(--border-strong);
   stroke-width: 1;
 }
 
 /* ---------------------------------------------------------------- balance sheet */
 
 /*
- * THE TWO SIDES OF THE BALANCE SHEET.
- *
- * Side by side on a real screen, stacked on a narrow one. This is the shape Tally's own Balance
- * Sheet has — liabilities and assets facing each other — and it is the shape an Indian SMB owner
- * has been reading for twenty years. `minmax(0, 1fr)` rather than `1fr`: a grid track's default
+ * THE TWO SIDES OF THE BALANCE SHEET — side by side on a real screen, stacked on a narrow one,
+ * the shape Tally's own Balance Sheet has. `minmax(0, 1fr)`: a grid track's default
  * `min-width: auto` refuses to shrink below its content, so a long group name would push the
  * other side off the card instead of ellipsing.
  */
 .sheet-sides {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
-  gap: 20px;
+  gap: clamp(20px, 3vw, 48px);
 }
 
-.sheet-side { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-
-.sheet-side-title {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
+.sheet-side { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 
 /* The nil-balance line: present, named, and visibly not part of either side — because the sign
    genuinely does not say which side it belongs on, and inventing one would be a lie about a
@@ -826,12 +797,12 @@ body::before {
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 5px 6px;
+  padding: 6px 6px;
   border: 0;
-  border-radius: 6px;
   background: none;
   color: inherit;
   font: inherit;
+  font-size: 13px;
   text-align: left;
   cursor: pointer;
 }
@@ -846,8 +817,9 @@ body::before {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 6px;
+  padding: 6px 6px;
   padding-left: calc(var(--depth) * 18px + 6px);
+  font-size: 13px;
 }
 
 .caret {
@@ -860,6 +832,7 @@ body::before {
 .tree-name {
   flex: 1;
   min-width: 0;
+  color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -867,11 +840,11 @@ body::before {
 
 .tree-value {
   font-variant-numeric: tabular-nums;
-  font-weight: 600;
+  font-weight: 500;
   white-space: nowrap;
 }
 /* Dr and Cr, not good and bad: a balance sheet has no opinion about which side you are on. */
-.tree-value.dr { color: var(--neutral); }
+.tree-value.dr { color: var(--text); }
 .tree-value.cr { color: var(--muted); }
 
 .tree-children { display: none; }
@@ -880,12 +853,15 @@ body::before {
 /* ---------------------------------------------------------------- empty */
 
 .empty {
+  flex: 1;
   display: grid;
   place-items: center;
   gap: 12px;
   padding: 72px 24px;
   text-align: center;
   color: var(--muted);
+  background: var(--card);
+  align-content: center;
 }
 
 .empty-text { max-width: 46ch; }
@@ -895,13 +871,12 @@ body::before {
 .skeleton { gap: 12px; }
 
 .sk {
-  background: color-mix(in srgb, var(--border) 60%, transparent);
-  border-radius: 6px;
+  background: var(--border);
   animation: shimmer 1.6s ease-in-out infinite;
 }
-.sk-title { height: 10px; width: 40%; }
-.sk-big { height: 30px; width: 62%; }
-.sk-line { height: 9px; width: 100%; }
+.sk-title { height: 8px; width: 34%; }
+.sk-big { height: 44px; width: 58%; }
+.sk-line { height: 8px; width: 100%; }
 
 @keyframes shimmer {
   50% { opacity: 0.45; }
@@ -931,7 +906,7 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(20, 18, 14, 0.45);
   z-index: 100;
   padding: 20px;
 }
@@ -939,30 +914,26 @@ body::before {
   position: relative;
   background: var(--card-solid);
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  padding: 28px;
-  width: min(92vw, 380px);
+  padding: 32px;
+  width: min(92vw, 400px);
   display: flex;
   flex-direction: column;
   gap: 14px;
-  box-shadow: var(--shadow-card), var(--glow-gold);
 }
 .unlock-card::before {
   content: "";
   position: absolute;
   inset: 0 0 auto 0;
-  height: 1px;
-  border-radius: var(--radius) var(--radius) 0 0;
-  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 20%, transparent));
 }
-.unlock-title { margin: 0; font-size: 18px; color: var(--text); }
+.unlock-title { margin: 0; font-size: 20px; font-weight: 400; letter-spacing: -0.02em; color: var(--text); }
 .unlock-sub { margin: 0; font-size: 13px; color: var(--muted); }
 .unlock-input {
   padding: 12px 14px;
   font-size: 16px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--bg-elev);
+  border: 1px solid var(--border-strong);
+  background: var(--card);
   color: var(--text);
 }
 .unlock-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }

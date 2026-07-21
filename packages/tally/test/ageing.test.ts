@@ -250,6 +250,27 @@ test('parseBillRow never emits a non-finite day count', () => {
   }
 });
 
+test('an undated bill is UNKNOWN age, not ancient — no false "180+ overdue"', () => {
+  // THE all-receivables-180+-overdue bug. An empty BillDate makes Tally return the as-of
+  // day-serial (~45,000) for F06, so every undated bill piles into the oldest bucket at once —
+  // which is what an owner saw as "all my money is 180+ days overdue". The TDL now emits -1 for
+  // an empty date; either way an IMPOSSIBLE age (negative, or older than 100 years) is treated as
+  // UNKNOWN and buckets as not_due, while the amount is preserved so the total stays exact.
+  const sentinel = parseBillRow(['Party', '', '0', '50000.00', '0', '-1'])!;
+  assert.equal(sentinel.daysSinceBill, 0);
+  assert.equal(sentinel.amountPaise, 5000000); // amount kept — only the ageing bucket is withheld
+  assert.equal(bucketFor(sentinel), 'not_due');
+
+  const epoch = parseBillRow(['Party', '', '0', '50000.00', '0', '45231'])!;
+  assert.equal(epoch.daysSinceBill, 0);
+  assert.equal(bucketFor(epoch), 'not_due');
+
+  // A genuinely old bill (400 days past due) is NOT clamped — real ageing must still survive.
+  const old = parseBillRow(['Party', '2025-01-01', '0', '50000.00', '0', '400'])!;
+  assert.equal(old.daysSinceBill, 400);
+  assert.equal(bucketFor(old), '180_plus');
+});
+
 test('a bill dated in the future is not due, not overdue', () => {
   // Tally lets a user post a bill with a future date. `daysSinceBill` is then negative.
   assert.equal(bucketFor({ daysSinceBill: -500, creditPeriodDays: 0 }), 'not_due');

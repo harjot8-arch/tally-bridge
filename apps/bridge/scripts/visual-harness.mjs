@@ -127,6 +127,13 @@ app.whenReady().then(async () => {
 
     await win.loadFile(join(RENDERER, 'index.html'));
 
+    // `webPreferences.zoomFactor` is only a DEFAULT, and Chromium persists the per-origin zoom
+    // level in the session partition on disk — so the 150% viewport's zoom leaked into every
+    // later window AND every later run, and every "1366px" screenshot was quietly a 911px one.
+    // An explicit set after load overrides the persisted level. (Found because a 3-across row
+    // rendered 2-across in a screenshot and 3-across in the DOM's own computed style.)
+    win.webContents.setZoomFactor(vp.zoom ?? 1);
+
     console.log(
       '  bridge installed:',
       await win.webContents.executeJavaScript('typeof window.bridge'),

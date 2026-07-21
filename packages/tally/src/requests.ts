@@ -220,7 +220,14 @@ export function billsRequest(opts: {
       { tag: 'F05', set: expr.logical('$IsAdvance') },
       // Raw days since the bill date. Bucketing happens in Node, not TDL, so buckets stay
       // tunable without redeploying TDL. Due-date ageing is F06 - F03.
-      { tag: 'F06', set: '$$Number:($$Date:##SVToDate - $BillDate)' },
+      //
+      // GUARD an empty BillDate. `##SVToDate - <empty date>` does NOT return 0 in TDL — it
+      // returns the as-of date's own day-serial (~45,000), so EVERY undated bill lands in the
+      // oldest overdue bucket at once. That is exactly the "all receivables 180+ days overdue"
+      // an owner reported. Emit -1 (an impossible age) for an undated bill; `parseBillRow`
+      // treats a negative/absurd age as UNKNOWN rather than ancient. The amount still counts in
+      // the total — only the ageing bucket is withheld, because a bill with no date has no age.
+      { tag: 'F06', set: 'if $$IsEmpty:$BillDate then -1 else $$Number:($$Date:##SVToDate - $BillDate)' },
       // WHICH SIDE this bill is on, as a FIELD rather than as a collection filter. See below.
       { tag: 'F07', set: `if $$IsLedOfGrp:${partyMethod}:${group} then 1 else 0` },
     ],

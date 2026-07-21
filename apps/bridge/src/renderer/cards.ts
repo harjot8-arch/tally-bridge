@@ -420,22 +420,21 @@ export function renderStock(vm: StockCard, t: T): HTMLElement {
     return c;
   }
 
-  const bars = el('div', 'bars');
+  // Name over its own hairline fill, value pinned right. The old four-column bar grid squeezed
+  // long group names against their values at narrow widths — the owner's screenshot showed them
+  // overlapping. Stacking name and bar means a name can only truncate, never collide.
+  const rows = el('div', 'stock-rows');
   for (const g of vm.groups) {
-    const row = el('div', 'bar-row');
-    mount(
-      row,
-      dot('neutral'),
-      el('span', 'bar-label', g.name),
-      // `share` is already clamped to 0..1 by the card layer, which also handles negative stock
-      // (real: issued before receipt). Do not recompute it here.
-      bar('neutral', g.share),
-      el('span', 'bar-value', g.value.compact),
-    );
+    const row = el('div', 'stock-row');
+    const head = el('div', 'stock-row-head');
+    mount(head, el('span', 'stock-name', g.name), el('span', 'stock-val', g.value.compact));
+    // `share` is already clamped to 0..1 by the card layer, which also handles negative stock
+    // (real: issued before receipt). Do not recompute it here.
+    mount(row, head, bar('neutral', g.share));
     row.setAttribute('title', `${g.name}: ${g.value.display}`);
-    mount(bars, row);
+    mount(rows, row);
   }
-  mount(c, bars);
+  mount(c, rows);
   return c;
 }
 

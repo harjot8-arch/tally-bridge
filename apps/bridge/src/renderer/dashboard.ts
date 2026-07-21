@@ -300,58 +300,57 @@ export function mountDashboard(container: Element, options: DashboardOptions = {
     const grid = el('div', 'grid');
 
     /*
-     * EVEN BY CONSTRUCTION, not by a masonry measurement pass.
+     * THE BENTO — rows of panels separated by 1px hairline gaps (see `.grid` in styles.css).
      *
-     * Cards are grouped into rows of like-height peers. Each row is its own auto-fit grid, so a
-     * row of four tiles fills the width evenly AND a row of one still fills it — the board stays
-     * tidy whether Tally returned every section or only two. Within a row the cards share a height
-     * (`align-items: stretch` in styles.css), which is what reads as "placed evenly"; the old
-     * masonry packed tight but left ragged, patchy bottoms, and that is the mess this replaces.
+     * The order is the order of the questions, and the ROW SHAPE says which question is biggest:
      *
-     * The order is still the order of the questions: the five-second TILES (cash, profit, stock,
-     * GST) first; then the two AGEING books the app was bought for, side by side; then the sales
-     * trend and, LAST, the balance sheet — the one card an owner READS, expanding groups on
-     * demand (`renderSheet` builds children lazily on open, so a distributor's thousands of nodes
-     * are never all painted at once).
+     *   .lede — the HERO: Cash & Bank at 2fr (the first question of the morning, with the
+     *           biggest number on the screen) beside Profit at 1fr.
+     *   .pair — the two AGEING books the app was bought for, side by side.
+     *   .trio — Sales trend, Stock, GST: the monthly rhythm.
+     *   .solo — LAST, the balance sheet, full width — the one card an owner READS, expanding
+     *           groups on demand (`renderSheet` builds children lazily on open).
      *
-     * A card is simply ABSENT when its section did not sync — a defined state, not an error. The
-     * `incomplete` banner above is what says the picture is partial.
+     * A card is simply ABSENT when its section did not sync — a defined state, not an error.
+     * `auto-fit` on pair/trio and `:only-child` on the lede mean a missing card widens its
+     * neighbours instead of leaving a grey void. The `incomplete` banner above is what says the
+     * picture is partial.
      */
-    const tileCards: HTMLElement[] = [];
-    if (cards?.cashBank) tileCards.push(renderCashBank(cards.cashBank, t));
-    if (cards?.profit) tileCards.push(renderProfit(cards.profit, t));
-    if (cards?.stock) tileCards.push(renderStock(cards.stock, t));
-    if (cards?.dutiesTaxes) tileCards.push(renderDutiesTaxes(cards.dutiesTaxes, t));
-    if (tileCards.length > 0) {
-      const tiles = el('div', 'grid-row tiles');
-      mount(tiles, ...tileCards);
-      mount(grid, tiles);
-    }
+    const addRow = (kind: 'lede' | 'pair' | 'trio' | 'solo', rowCards: HTMLElement[]): void => {
+      if (rowCards.length === 0) return;
+      const row = el('div', `grid-row ${kind}`);
+      mount(row, ...rowCards);
+      mount(grid, row);
+    };
 
-    const ageingCards: HTMLElement[] = [];
-    if (cards?.receivables) ageingCards.push(renderAgeing(cards.receivables, t));
-    if (cards?.payables) ageingCards.push(renderAgeing(cards.payables, t));
-    if (ageingCards.length > 0) {
-      const ageing = el('div', 'grid-row pair');
-      mount(ageing, ...ageingCards);
-      mount(grid, ageing);
+    const lede: HTMLElement[] = [];
+    if (cards?.cashBank) {
+      const hero = renderCashBank(cards.cashBank, t);
+      // The hero class scales the number up and draws the one gold hairline. Set here, not in
+      // the render function: which card leads is this layout's decision, not the card's.
+      hero.classList.add('hero');
+      lede.push(hero);
     }
+    if (cards?.profit) lede.push(renderProfit(cards.profit, t));
+    addRow('lede', lede);
 
-    // The trend and the sheet share the last row. Sales full-width blows the 340-wide chart up to
-    // ~650px tall; at half width it is the ~330px the original design was tuned for. The sheet
-    // stays readable at half — its two sides auto-fit and stack when they must. When a lone one of
-    // the two is present it fills the row, which is fine.
-    const bottomCards: HTMLElement[] = [];
-    if (cards?.salesTrend) bottomCards.push(renderTrend(cards.salesTrend, t, locale));
-    if (cards?.balanceSheet?.length) bottomCards.push(renderSheet(cards.balanceSheet, t));
-    if (bottomCards.length > 0) {
-      const bottom = el('div', 'grid-row pair');
-      mount(bottom, ...bottomCards);
-      mount(grid, bottom);
-    }
+    const books: HTMLElement[] = [];
+    if (cards?.receivables) books.push(renderAgeing(cards.receivables, t));
+    if (cards?.payables) books.push(renderAgeing(cards.payables, t));
+    addRow('pair', books);
 
-    // Desaturate the numbers when they are not current. The banner says it in words; this makes
-    // it impossible to glance past.
+    // Sales at a third of the width keeps the 340-wide chart near the ~330px it was tuned for.
+    const rhythm: HTMLElement[] = [];
+    if (cards?.salesTrend) rhythm.push(renderTrend(cards.salesTrend, t, locale));
+    if (cards?.stock) rhythm.push(renderStock(cards.stock, t));
+    if (cards?.dutiesTaxes) rhythm.push(renderDutiesTaxes(cards.dutiesTaxes, t));
+    addRow('trio', rhythm);
+
+    if (cards?.balanceSheet?.length) addRow('solo', [renderSheet(cards.balanceSheet, t)]);
+
+    // Mark the grid stale when the numbers are not current. The BANNER carries the message in
+    // words; this class is a styling hook and a test surface, deliberately without a heavy
+    // visual treatment — greying out the owner's real (if older) numbers read as "broken".
     if (status.state !== 'ok') grid.classList.add('stale');
 
     gridEl = grid;

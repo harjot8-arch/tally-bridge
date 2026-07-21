@@ -38,7 +38,9 @@ export interface Slice {
 }
 
 const R = 42;
-const STROKE = 15;
+// Thin, architectural. The ring is a proportion instrument, not a pie — 7 units of stroke reads
+// as a hairline gauge and leaves the centre number the loudest thing in the card.
+const STROKE = 7;
 const CIRCUMFERENCE = 2 * Math.PI * R;
 
 /**
@@ -214,7 +216,8 @@ export function columnChart(columns: readonly Column[], ariaLabel: string): SVGE
       y: (h < 2 ? Math.min(top, zeroY - 2) : top).toFixed(2),
       width: barW.toFixed(2),
       height: Math.max(2, h).toFixed(2),
-      rx: '2',
+      // Square corners — the architectural grid has no radii anywhere.
+      rx: '0',
     });
     const title = svg('title');
     title.textContent = `${c.label}: ${c.title}`;
