@@ -42,6 +42,12 @@ jobs:
       - name: Build the app
         run: npm run build -w @tally-bridge/bridge
 
+      # The deployable dashboard bundle the cloud-setup uploads to Vercel. It is gitignored, so it
+      # MUST be generated here — without it the packaged app has no dashboard files to deploy and
+      # cloud setup fails with "missing its dashboard files".
+      - name: Build the deploy bundle
+        run: npm run build:deploy-bundle
+
       # Give better-sqlite3 an Electron-ABI binary. Done DIRECTLY in its own folder — first try a
       # published Electron prebuild, then compile from source (windows-latest has the C++
       # toolchain) — rather than via `npm rebuild`, which npm's install-script gate blocks, and
