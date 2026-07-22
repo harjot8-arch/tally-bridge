@@ -53,6 +53,8 @@ function fakeBridge(overrides: Partial<BridgeApi> = {}): BridgeApi {
     detectTally: async () => ({ reachable: true, message: '', companies: [] }),
     unlock: async () => true,
     lock: async () => {},
+    resetDashboard: async () => {},
+    rebuildFromTally: async () => {},
     getCards: async () => ready('-100000.00'),
     openExternal: async () => {},
     onStatusChanged: () => () => {},

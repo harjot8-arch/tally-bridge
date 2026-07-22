@@ -617,6 +617,15 @@ function registerIpc(): void {
     store?.reset();
   });
 
+  // The GENTLE recovery: clear only the local data cache and KEEP the identity, so the next sync
+  // re-extracts fresh from Tally. This is the fix for "your saved dashboard data could not be
+  // read" — usually snapshots from a previous identity — without dragging the owner back through
+  // setup and a Vercel redeploy. The keystore is deliberately untouched.
+  ipcMain.handle(CHANNELS.rebuildFromTally, async () => {
+    snapshots?.clear();
+    store?.reset();
+  });
+
   // ---- Setup wizard. The machine is the authority; these verbs are its only doorway. ----
 
   ipcMain.handle(CHANNELS.getWizardState, async () => ensureWizardHost().getState());

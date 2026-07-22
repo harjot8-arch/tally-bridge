@@ -186,6 +186,8 @@ function fakeBridge(overrides: Partial<BridgeApi> = {}): BridgeApi {
     detectTally: async () => ({ reachable: true, message: '', companies: [] }),
     unlock: async () => true,
     lock: async () => {},
+    resetDashboard: async () => {},
+    rebuildFromTally: async () => {},
     getCards: async () => ready([acme()]),
     openExternal: async () => {},
     onStatusChanged: () => () => {},
@@ -325,6 +327,42 @@ test('locked with no unlock handler still says what is true, with no dead button
     byClass(root, 'status-action').some((b) => b.textContent === 'Unlock'),
     false,
   );
+  dash.destroy();
+});
+
+test('the unreadable-data error offers Re-sync, which clears the cache and pulls from Tally', async () => {
+  const root = container();
+  const calls: string[] = [];
+  // First read is the error (stale snapshots the new identity cannot decrypt); after a rebuild +
+  // sync the board is readable. This is the exact recovery a stuck owner needs — no re-setup.
+  let healed = false;
+  const dash = mountDashboard(root as unknown as Element, {
+    bridge: fakeBridge({
+      rebuildFromTally: async () => {
+        calls.push('rebuild');
+        healed = true;
+      },
+      syncNow: async () => {
+        calls.push('sync');
+      },
+      getCards: async () =>
+        healed ? ready([acme()]) : { state: 'error', message: 'Your saved dashboard data could not be read on this computer.' },
+    }),
+    now: () => 1_000_000,
+  });
+  await dash.refresh();
+
+  assert.ok(allText(root).includes('could not be read'));
+  const btn = byClass(root, 'status-action').find((b) => b.textContent === 'Re-sync from Tally');
+  assert.ok(btn, 'the error state must offer Re-sync, not a useless Try again');
+
+  btn!.click();
+  await settle();
+
+  // Cleared the cache FIRST, then synced — order matters, a sync before the clear would re-read
+  // the same unreadable data.
+  assert.deepEqual(calls, ['rebuild', 'sync']);
+  assert.ok(!allText(root).includes('could not be read'), 'the board recovered after the re-sync');
   dash.destroy();
 });
 

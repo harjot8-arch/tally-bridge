@@ -134,6 +134,7 @@ const en = {
   'error.cards': 'Some figures are missing from this view. The next sync usually fills them in.',
   'error.generic': 'Your data could not be read.',
   'error.unreachable': 'Tally Bridge is not responding. Restarting the app usually fixes this.',
+  'error.resync': 'Re-sync from Tally',
   'action.retry': 'Try again',
 
   'locked.body': 'Your data is locked. Enter your passphrase to see your figures.',
@@ -252,6 +253,7 @@ const hi: Partial<Record<StringKey, string>> = {
   'error.cards': 'इस दृश्य में कुछ आँकड़े नहीं हैं। अगला सिंक आमतौर पर उन्हें भर देता है।',
   'error.generic': 'आपका डेटा पढ़ा नहीं जा सका।',
   'error.unreachable': 'Tally Bridge जवाब नहीं दे रहा। ऐप को दोबारा शुरू करने से यह ठीक हो जाता है।',
+  'error.resync': 'Tally से दोबारा सिंक करें',
   'action.retry': 'फिर कोशिश करें',
 
   'locked.body': 'आपका डेटा लॉक है। आँकड़े देखने के लिए अपना पासफ़्रेज़ डालें।',

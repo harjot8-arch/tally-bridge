@@ -34,6 +34,7 @@ export const CHANNELS = {
   unlock: 'bridge:unlock',
   lock: 'bridge:lock',
   resetDashboard: 'bridge:resetDashboard',
+  rebuildFromTally: 'bridge:rebuildFromTally',
   isProvisioned: 'bridge:isProvisioned',
   detectTally: 'bridge:detectTally',
   listCompanies: 'bridge:listCompanies',
@@ -132,6 +133,14 @@ export interface BridgeApi {
    * the renderer confirms first.
    */
   resetDashboard(): Promise<void>;
+  /**
+   * The GENTLE recovery, distinct from resetDashboard: drops only this computer's local data cache
+   * (snapshots + sync watermarks) and KEEPS the identity, device pairing, and deployment. Used
+   * when the dashboard cannot read its stored data — usually stale snapshots from a previous
+   * identity — so the next sync re-extracts everything fresh from Tally. No re-setup, no new
+   * passphrase, no redeploy. Safe: the cleared data is a cache; Tally is the source of truth.
+   */
+  rebuildFromTally(): Promise<void>;
   getCards(): Promise<GetCardsResult>;
   /** Main-process side validates the URL against an allowlist; this is not a general opener. */
   openExternal(url: string): Promise<void>;

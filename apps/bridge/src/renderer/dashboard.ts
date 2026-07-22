@@ -237,6 +237,13 @@ export function mountDashboard(container: Element, options: DashboardOptions = {
     await refresh();
   }
 
+  /** Drop the unreadable local cache, then pull fresh from Tally — the error-state recovery. */
+  async function rebuild(): Promise<void> {
+    if (syncing) return;
+    await ask(() => bridge.rebuildFromTally(), undefined);
+    await sync(); // clears the board to skeleton, syncs, and refreshes
+  }
+
   // ------------------------------------------------------------ banners
 
   function paintBanners(): void {
@@ -293,8 +300,11 @@ export function mountDashboard(container: Element, options: DashboardOptions = {
         return;
 
       case 'error':
-        // The main process guarantees one plain sentence here.
-        mount(content, renderEmpty(model.message ?? t('error.generic'), t('action.retry'), () => void refresh()));
+        // The main process guarantees one plain sentence here. The action is Re-sync, NOT "Try
+        // again": this state means the STORED data could not be read (usually stale snapshots from
+        // a previous identity), and re-reading the same bytes would fail identically. Clearing the
+        // local cache and pulling fresh from Tally is the recovery that actually works.
+        mount(content, renderEmpty(model.message ?? t('error.generic'), t('error.resync'), () => void rebuild()));
         return;
 
       case 'unavailable':
