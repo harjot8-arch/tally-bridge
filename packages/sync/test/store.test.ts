@@ -159,6 +159,28 @@ test('resetCompany clears watermark, hashes, and queue for that company only', a
   }
 });
 
+test('reset() clears EVERY company — the "start over" full wipe', async () => {
+  const { store, cleanup } = tmp();
+  try {
+    store.setWatermark({ companyGuid: 'guid-a', altMstId: 1, altVchId: 1 }, NOW);
+    store.setWatermark({ companyGuid: 'guid-b', altMstId: 1, altVchId: 1 }, NOW);
+    store.ackSectionHash('guid-a', 'group_balance', '2026-07-16', 'h', NOW);
+    store.enqueue(row(), NOW);
+    store.enqueue({ ...row(), companyGuid: 'guid-b' }, NOW);
+
+    store.reset();
+
+    // Every company gone — the point is that the next cycle re-extracts EVERYTHING, so a stale
+    // watermark can never leave the new identity staring at snapshots it cannot decrypt.
+    assert.equal(store.getWatermark('guid-a'), undefined);
+    assert.equal(store.getWatermark('guid-b'), undefined);
+    assert.equal(store.getSectionHash('guid-a', 'group_balance', '2026-07-16'), undefined);
+    assert.equal(store.depth(), 0, 'the outbox is empty');
+  } finally {
+    cleanup();
+  }
+});
+
 test('the quirks cache round-trips and stays a single row', async () => {
   const { store, cleanup } = tmp();
   try {

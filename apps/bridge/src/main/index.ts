@@ -603,12 +603,18 @@ function registerIpc(): void {
     session?.lock();
   });
 
-  // The forgotten-passphrase reset. Lock FIRST (zero any live key), then wipe the keystore so
-  // isProvisioned() flips to false and the renderer's route() lands back on the setup wizard.
+  // The forgotten-passphrase reset. Lock FIRST (zero any live key), then wipe ALL of this
+  // machine's local state, because a partial wipe is worse than none: keeping the old snapshots
+  // (sealed to the DISCARDED identity) makes the new identity's dashboard read "data could not be
+  // read", and keeping the sync watermarks makes the next sync report "nothing changed" and write
+  // no fresh snapshots — so the dashboard never recovers. Clear the keystore (→ isProvisioned()
+  // false → route() shows the wizard), the snapshot store, and the sync watermarks/hashes/outbox.
   // Destructive and irreversible on this machine; the renderer gates it behind a confirmation.
   ipcMain.handle(CHANNELS.resetDashboard, async () => {
     session?.lock();
     keystore?.wipe();
+    snapshots?.clear();
+    store?.reset();
   });
 
   // ---- Setup wizard. The machine is the authority; these verbs are its only doorway. ----

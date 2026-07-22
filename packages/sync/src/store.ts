@@ -119,6 +119,24 @@ export class SyncStore {
     tx(companyGuid);
   }
 
+  /**
+   * Full local reset for "start over": drop EVERY company's sync state so the next cycle
+   * re-extracts everything from Tally under the new identity. Without clearing watermarks the
+   * AlterID gate would report "nothing changed" and write no new snapshots — leaving only the old
+   * identity's snapshots, which the new identity cannot decrypt (the dashboard then shows "data
+   * could not be read"). Section hashes (the upload gate) and the outbox (uploads sealed to the
+   * discarded identity) go too. The Tally capability probe is KEPT: it describes the Tally
+   * install, not the identity, so re-probing would be pure waste.
+   */
+  reset(): void {
+    const tx = this.db.transaction(() => {
+      this.db.prepare('DELETE FROM watermark').run();
+      this.db.prepare('DELETE FROM section_hash').run();
+      this.db.prepare('DELETE FROM outbox').run();
+    });
+    tx();
+  }
+
   // ------------------------------------------------------------------ section hashes
 
   getSectionHash(companyGuid: string, section: Section, asOf: IsoDate): string | undefined {
