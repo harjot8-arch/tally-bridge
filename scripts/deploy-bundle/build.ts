@@ -228,7 +228,22 @@ export async function buildDeployBundle(opts: BuildOptions): Promise<BuildResult
   // index.html/app.js/viewmap.js are the owner's dashboard UI (apps/web/ui, copied into dist
   // by apps/web/build.mjs). NEVER ship apps/web/ui/index.original.html — it is the design
   // reference and still contains the Math.random() simulation and the cdnjs GSAP tag.
-  for (const asset of ['tally-data.js', 'tally-worker.js', 'index.html', 'app.js', 'viewmap.js']) {
+  //
+  // The .js.map files MUST ship too: esbuild appends `//# sourceMappingURL=<name>.map` to each
+  // bundle, so a browser with devtools open fetches them — and if they are absent that is a bare
+  // "Failed to load resource: 404" in the console, which reads as a broken deployment. They leak
+  // nothing not already public (the source is unminified and the repo is public) and make a real
+  // stack trace legible when a dashboard problem does need debugging.
+  for (const asset of [
+    'tally-data.js',
+    'tally-data.js.map',
+    'tally-worker.js',
+    'tally-worker.js.map',
+    'index.html',
+    'app.js',
+    'viewmap.js',
+    'viewmap.js.map',
+  ]) {
     const from = join(webDist, asset);
     if (!existsSync(from)) continue;
     write(`static/${asset}`, readFileSync(from));
