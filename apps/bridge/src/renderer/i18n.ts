@@ -145,6 +145,13 @@ const en = {
   'unlock.working': 'Unlocking…',
   'unlock.wrong': 'That passphrase did not work. Please try again.',
   'unlock.cancel': 'Cancel',
+  'unlock.forgot': 'Forgot your passphrase?',
+  'reset.title': 'Start over?',
+  'reset.body':
+    'This erases the dashboard saved on this computer and starts setup again. Your Tally data is completely safe — nothing there is touched. You will choose a new passphrase, and your figures come back from Tally on their own.',
+  'reset.confirm': 'Yes, start over',
+  'reset.working': 'Starting over…',
+  'reset.failed': 'Could not start over. Please try again.',
 
   'empty.all': 'No data yet. Once Tally has been open for one sync, your numbers appear here.',
 } satisfies Record<string, string>;
@@ -256,6 +263,13 @@ const hi: Partial<Record<StringKey, string>> = {
   'unlock.working': 'खोल रहे हैं…',
   'unlock.wrong': 'यह पासफ़्रेज़ काम नहीं आया। कृपया फिर से आज़माएँ।',
   'unlock.cancel': 'रद्द करें',
+  'unlock.forgot': 'पासफ़्रेज़ भूल गए?',
+  'reset.title': 'फिर से शुरू करें?',
+  'reset.body':
+    'इससे इस कंप्यूटर पर सहेजा गया डैशबोर्ड मिट जाएगा और सेटअप फिर से शुरू होगा। आपका Tally डेटा पूरी तरह सुरक्षित है — उसे कुछ नहीं होता। आप एक नया पासफ़्रेज़ चुनेंगे, और आपके आँकड़े Tally से अपने आप वापस आ जाएँगे।',
+  'reset.confirm': 'हाँ, फिर से शुरू करें',
+  'reset.working': 'फिर से शुरू कर रहे हैं…',
+  'reset.failed': 'फिर से शुरू नहीं हो सका। कृपया फिर से आज़माएँ।',
 
   'empty.all': 'अभी कोई डेटा नहीं। Tally के एक बार खुलने और सिंक होते ही आपके आँकड़े यहाँ दिखेंगे।',
 };

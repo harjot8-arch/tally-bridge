@@ -45,6 +45,7 @@ const CHANNELS = {
   getCards: 'bridge:getCards',
   unlock: 'bridge:unlock',
   lock: 'bridge:lock',
+  resetDashboard: 'bridge:resetDashboard',
   isProvisioned: 'bridge:isProvisioned',
   detectTally: 'bridge:detectTally',
   listCompanies: 'bridge:listCompanies',
@@ -90,6 +91,7 @@ const api: BridgeApi = {
   // and is never persisted anywhere. It must not be logged, and it must not be echoed back.
   unlock: (passphrase: string) => ipcRenderer.invoke(CHANNELS.unlock, passphrase),
   lock: () => ipcRenderer.invoke(CHANNELS.lock),
+  resetDashboard: () => ipcRenderer.invoke(CHANNELS.resetDashboard),
   getCards: () => ipcRenderer.invoke(CHANNELS.getCards),
   openExternal: (url: string) => ipcRenderer.invoke(CHANNELS.openExternal, url),
   getMobileAccess: () => ipcRenderer.invoke(CHANNELS.getMobileAccess),

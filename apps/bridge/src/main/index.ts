@@ -603,6 +603,14 @@ function registerIpc(): void {
     session?.lock();
   });
 
+  // The forgotten-passphrase reset. Lock FIRST (zero any live key), then wipe the keystore so
+  // isProvisioned() flips to false and the renderer's route() lands back on the setup wizard.
+  // Destructive and irreversible on this machine; the renderer gates it behind a confirmation.
+  ipcMain.handle(CHANNELS.resetDashboard, async () => {
+    session?.lock();
+    keystore?.wipe();
+  });
+
   // ---- Setup wizard. The machine is the authority; these verbs are its only doorway. ----
 
   ipcMain.handle(CHANNELS.getWizardState, async () => ensureWizardHost().getState());

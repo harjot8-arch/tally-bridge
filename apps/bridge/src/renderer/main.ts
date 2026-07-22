@@ -245,11 +245,91 @@ function promptUnlock(host: HTMLElement): void {
     if (e.key === 'Escape') close();
   });
 
+  // The forgotten-passphrase escape hatch. A locked-out owner who genuinely cannot recall the
+  // passphrase would otherwise be stuck at this prompt forever — the exact dead end the recovery
+  // design named. It opens a confirmation, never resets on the first click.
+  const forgot = button('unlock-forgot', t('unlock.forgot'), () => {
+    close();
+    promptReset(host);
+  });
+
   mount(actions, cancel, submit);
-  mount(card, el('h2', 'unlock-title', t('unlock.title')), el('p', 'unlock-sub', t('unlock.sub')), input, error, actions);
+  mount(
+    card,
+    el('h2', 'unlock-title', t('unlock.title')),
+    el('p', 'unlock-sub', t('unlock.sub')),
+    input,
+    error,
+    actions,
+    forgot,
+  );
   mount(overlay, card);
   mount(host, overlay);
   input.focus();
+}
+
+/**
+ * The "start over" confirmation. Reachable only from the unlock prompt's "Forgot your passphrase?"
+ * link, because this WIPES the local dashboard keys — it must never be one stray click away.
+ *
+ * On confirm it resets and then re-routes: `resetDashboard` flips `isProvisioned()` to false, so
+ * `route()` hands the screen to the setup wizard and clears this host (removing this overlay) on
+ * the way. The owner sets a new passphrase and the figures come back from Tally.
+ */
+function promptReset(host: HTMLElement): void {
+  if (host.querySelector('.reset-overlay')) return;
+  const t = translator(currentLocale());
+
+  const overlay = el('div', 'unlock-overlay reset-overlay');
+  const card = el('div', 'unlock-card');
+  const error = el('p', 'unlock-error');
+  const actions = el('div', 'unlock-actions');
+
+  const close = () => {
+    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+  };
+
+  const cancel = button('status-action', t('unlock.cancel'), close);
+  const confirm = button('status-action primary', t('reset.confirm'), () => void doReset());
+
+  async function doReset(): Promise<void> {
+    confirm.disabled = true;
+    cancel.disabled = true;
+    error.textContent = '';
+    confirm.textContent = t('reset.working');
+    let ok = true;
+    try {
+      await window.bridge.resetDashboard();
+    } catch {
+      ok = false;
+    }
+    if (!ok) {
+      confirm.disabled = false;
+      cancel.disabled = false;
+      confirm.textContent = t('reset.confirm');
+      error.textContent = t('reset.failed');
+      return;
+    }
+    // Wiped. Do NOT close() first — route() clears this host, which removes the overlay anyway,
+    // and closing early would briefly flash the locked dashboard behind it before the wizard.
+    void route();
+  }
+
+  overlay.addEventListener('keydown', (e) => {
+    if ((e as KeyboardEvent).key === 'Escape') close();
+  });
+
+  mount(actions, cancel, confirm);
+  mount(
+    card,
+    el('h2', 'unlock-title', t('reset.title')),
+    el('p', 'unlock-sub', t('reset.body')),
+    error,
+    actions,
+  );
+  mount(overlay, card);
+  mount(host, overlay);
+  confirm.focus();
 }
 
 function boot(): void {

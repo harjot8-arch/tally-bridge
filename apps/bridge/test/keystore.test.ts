@@ -101,6 +101,30 @@ test('isProvisioned needs both the device key and the identity public key', () =
   assert.equal(ks.isProvisioned(), true);
 });
 
+test('wipe() returns the app to first-run: nothing provisioned, no keys left behind', () => {
+  // The "start over" recovery path. A wiped keystore must read as unprovisioned so the shell's
+  // route() lands on the setup wizard, AND every secret must actually be gone from the backend —
+  // a wipe that left the wrapped identity behind would be a forgotten-passphrase dead end that
+  // looks reset but is not.
+  const backend = memBackend();
+  const ks = new Keystore(fakeSafe(), backend);
+  ks.setDevice('d', new Uint8Array([1]), new Uint8Array([2]));
+  ks.setIdentityPublicKey(new Uint8Array(32).fill(9));
+  ks.setWrappedIdentityForPassphrase('{"wrapped":"blob"}');
+  ks.setTenantId('tn_abc');
+  ks.setServerUrl('https://x.vercel.app');
+  assert.equal(ks.isProvisioned(), true);
+
+  ks.wipe();
+
+  assert.equal(ks.isProvisioned(), false);
+  assert.equal(ks.getWrappedIdentityForPassphrase(), undefined);
+  assert.equal(ks.getTenantId(), undefined);
+  assert.equal(ks.getServerUrl(), undefined);
+  assert.equal(ks.getIdentityPublicKey(), undefined);
+  assert.equal(backend.store.size, 0, 'no key material may survive a wipe');
+});
+
 test('an undecryptable blob reads as absent instead of wedging the app', () => {
   // The OS key changes on a Windows profile reset or a restore to a different machine, making
   // the blob undecryptable FOREVER. Re-pairing is a 6-digit code; wedging is a dead install.

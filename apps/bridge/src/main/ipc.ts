@@ -33,6 +33,7 @@ export const CHANNELS = {
   getCards: 'bridge:getCards',
   unlock: 'bridge:unlock',
   lock: 'bridge:lock',
+  resetDashboard: 'bridge:resetDashboard',
   isProvisioned: 'bridge:isProvisioned',
   detectTally: 'bridge:detectTally',
   listCompanies: 'bridge:listCompanies',
@@ -123,6 +124,14 @@ export interface BridgeApi {
   /** Returns false on a wrong passphrase — never throws, never says which part was wrong. */
   unlock(passphrase: string): Promise<boolean>;
   lock(): Promise<void>;
+  /**
+   * The forgotten-passphrase escape hatch: locks the session and WIPES this computer's local
+   * dashboard keys, so the app returns to first-run setup. The owner then sets a new passphrase
+   * and the figures come back from Tally (the source of truth). Nothing on the server is touched;
+   * its old ciphertext is sealed to the discarded identity and simply goes unread. Irreversible —
+   * the renderer confirms first.
+   */
+  resetDashboard(): Promise<void>;
   getCards(): Promise<GetCardsResult>;
   /** Main-process side validates the URL against an allowlist; this is not a general opener. */
   openExternal(url: string): Promise<void>;
