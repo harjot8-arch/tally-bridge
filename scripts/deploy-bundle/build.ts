@@ -162,7 +162,12 @@ export async function buildDeployBundle(opts: BuildOptions): Promise<BuildResult
   const SECURITY_HEADERS = {
     'Content-Security-Policy': [
       "default-src 'self'",
-      "script-src 'self'",
+      // 'wasm-unsafe-eval' is REQUIRED, not optional: the dashboard runs Argon2id via libsodium's
+      // WebAssembly inside the unlock Web Worker, and browsers gate WebAssembly.instantiate() behind
+      // script-src. Bare 'self' makes the wasm refuse to compile, the worker throws on the first
+      // derive, and the whole sign-in dies with an opaque error — on every browser, phone included.
+      // This token allows wasm compilation WITHOUT allowing eval() (unlike 'unsafe-eval').
+      "script-src 'self' 'wasm-unsafe-eval'",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data:",
       "font-src 'self'",

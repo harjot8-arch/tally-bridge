@@ -22,6 +22,13 @@ import type { OpenedPass, UnlockDeps } from './unlock.ts';
  * the frozen page.
  */
 
+/** An engine/infrastructure fault (not a crypto result). Tagged so unlock.ts never calls it a typo. */
+function workerError(message: string): Error {
+  const e = new Error(message);
+  e.name = 'WorkerError';
+  return e;
+}
+
 /** `Omit` does not distribute over a union; this does — a request minus its correlation id. */
 type WorkerRequestBody = WorkerRequest extends infer R
   ? R extends { id: number }
@@ -33,6 +40,10 @@ type WorkerRequestBody = WorkerRequest extends infer R
 export interface WorkerLike {
   postMessage(msg: WorkerRequest): void;
   addEventListener(type: 'message', listener: (ev: { data: WorkerResponse }) => void): void;
+  // A module-worker load/parse failure, or an uncaught throw inside the worker (libsodium's wasm
+  // failing to instantiate is the common one), fires 'error' — NOT 'message'. Without a listener
+  // for it every pending unlock promise hangs forever and the button sticks on "Deriving key…".
+  addEventListener(type: 'error', listener: (ev: { message?: string } | unknown) => void): void;
 }
 
 /**
@@ -49,6 +60,21 @@ export function workerUnlockSeams(
 ): Required<Pick<UnlockDeps, 'deriveAuthToken' | 'openPassIdentity'>> {
   let nextId = 1;
   const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
+
+  // The worker itself dying (wasm refused by CSP, module load 404, uncaught init throw) must fail
+  // EVERY in-flight call, tagged 'WorkerError' so unlock.ts reports it as an engine fault — never
+  // as a wrong passphrase (the openPass catch maps unknown errors to 'credentials' by default).
+  worker.addEventListener('error', (ev) => {
+    const raw = ev as { message?: unknown } | null;
+    const err = new Error(
+      raw && typeof raw.message === 'string' && raw.message.length > 0
+        ? raw.message
+        : 'the sign-in engine could not start in this browser',
+    );
+    err.name = 'WorkerError';
+    for (const [, p] of pending) p.reject(err);
+    pending.clear();
+  });
 
   worker.addEventListener('message', (ev) => {
     const res = ev.data as Partial<WorkerResponse> | null;
@@ -83,7 +109,7 @@ export function workerUnlockSeams(
     deriveAuthToken: async (passphrase, kdf) => {
       const v = await call({ op: 'derive-auth', passphrase, kdf });
       if (!(v instanceof Uint8Array)) {
-        throw new Error('the unlock worker returned a non-binary auth token');
+        throw workerError('the unlock worker returned a non-binary auth token');
       }
       return v;
     },
@@ -99,7 +125,7 @@ export function workerUnlockSeams(
         !Array.isArray(o.roster) ||
         typeof o.rosterVersion !== 'number'
       ) {
-        throw new Error('the unlock worker returned a malformed identity');
+        throw workerError('the unlock worker returned a malformed identity');
       }
       return { identitySecretKey: o.identitySecretKey, roster: o.roster, rosterVersion: o.rosterVersion };
     },

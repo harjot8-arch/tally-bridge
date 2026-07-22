@@ -134,12 +134,25 @@ const stockRows = [
   { companyGuid: GUID, asOf: AS_OF, stockGroup: 'Pipes & Fittings', closingValue: '-2100000.00' },
 ];
 
+// Shaped like a REAL Tally balance sheet: several roots per side, some with children. A thin
+// two-root fixture never exercised the wide-viewport overflow an owner hit at 1920px, where the
+// deeper asset roots' values ran off the right edge. Assets are Dr (negative), liabilities Cr.
 const groupRows = [
-  { companyGuid: GUID, asOf: AS_OF, groupName: 'Current Assets', parent: '', primaryGroup: 'Current Assets', isRevenue: false, opening: '-10000000.00', closing: '-14500000.00' },
+  // Liabilities (WHAT YOU OWE) — positive closing.
+  { companyGuid: GUID, asOf: AS_OF, groupName: 'Capital Account', parent: '', primaryGroup: 'Capital Account', isRevenue: false, opening: '20000000.00', closing: '24501062.00' },
+  { companyGuid: GUID, asOf: AS_OF, groupName: 'Current Liabilities', parent: '', primaryGroup: 'Current Liabilities', isRevenue: false, opening: '10000000.00', closing: '12312936.00' },
+  { companyGuid: GUID, asOf: AS_OF, groupName: 'Sundry Creditors', parent: 'Current Liabilities', primaryGroup: 'Current Liabilities', isRevenue: false, opening: '8000000.00', closing: '11672736.00' },
+  { companyGuid: GUID, asOf: AS_OF, groupName: 'Duties & Taxes', parent: 'Current Liabilities', primaryGroup: 'Current Liabilities', isRevenue: false, opening: '2000000.00', closing: '640200.00' },
+  { companyGuid: GUID, asOf: AS_OF, groupName: 'Loans (Liability)', parent: '', primaryGroup: 'Loans (Liability)', isRevenue: false, opening: '5000000.00', closing: '4273482.00' },
+  // Assets (WHAT YOU OWN) — negative closing.
+  { companyGuid: GUID, asOf: AS_OF, groupName: 'Current Assets', parent: '', primaryGroup: 'Current Assets', isRevenue: false, opening: '-30000000.00', closing: '-41846538.00' },
   { companyGuid: GUID, asOf: AS_OF, groupName: 'Bank Accounts', parent: 'Current Assets', primaryGroup: 'Current Assets', isRevenue: false, opening: '-10000000.00', closing: '-13892000.00' },
-  { companyGuid: GUID, asOf: AS_OF, groupName: 'Sundry Debtors', parent: 'Current Assets', primaryGroup: 'Current Assets', isRevenue: false, opening: '-3000000.00', closing: '-4820500.00' },
-  { companyGuid: GUID, asOf: AS_OF, groupName: 'Current Liabilities', parent: '', primaryGroup: 'Current Liabilities', isRevenue: false, opening: '4000000.00', closing: '5200000.00' },
-  { companyGuid: GUID, asOf: AS_OF, groupName: 'Sundry Creditors', parent: 'Current Liabilities', primaryGroup: 'Current Liabilities', isRevenue: false, opening: '4000000.00', closing: '4820500.00' },
+  { companyGuid: GUID, asOf: AS_OF, groupName: 'Sundry Debtors', parent: 'Current Assets', primaryGroup: 'Current Assets', isRevenue: false, opening: '-3000000.00', closing: '-6320500.00' },
+  { companyGuid: GUID, asOf: AS_OF, groupName: 'Cash-in-Hand', parent: 'Current Assets', primaryGroup: 'Current Assets', isRevenue: false, opening: '-500000.00', closing: '-342110.00' },
+  { companyGuid: GUID, asOf: AS_OF, groupName: 'Fixed Assets', parent: '', primaryGroup: 'Fixed Assets', isRevenue: false, opening: '-2000000.00', closing: '-2438868.00' },
+  { companyGuid: GUID, asOf: AS_OF, groupName: 'Investments', parent: '', primaryGroup: 'Investments', isRevenue: false, opening: '-3000000.00', closing: '-3000000.00' },
+  { companyGuid: GUID, asOf: AS_OF, groupName: 'Loans & Advances (Asset)', parent: '', primaryGroup: 'Loans & Advances (Asset)', isRevenue: false, opening: '-2400000.00', closing: '-2400000.00' },
+  { companyGuid: GUID, asOf: AS_OF, groupName: 'Deposits (Asset)', parent: '', primaryGroup: 'Deposits (Asset)', isRevenue: false, opening: '-2300000.00', closing: '-2300000.00' },
   // A revenue group, deliberately: `balanceSheetTree` must filter it out. If it shows up in the
   // screenshot, the P&L has leaked into the balance sheet.
   { companyGuid: GUID, asOf: AS_OF, groupName: 'Sales', parent: '', primaryGroup: 'Sales Accounts', isRevenue: true, opening: '0.00', closing: '3800000.00' },

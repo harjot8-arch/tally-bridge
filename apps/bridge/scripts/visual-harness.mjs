@@ -57,6 +57,11 @@ const SHOW = process.argv.includes('--show');
 const VIEWPORTS = [
   { name: 'shop-pc-1366x768', width: 1366, height: 768 },
   { name: 'narrow-1024x768', width: 1024, height: 768 },
+  // A 1920×1080 desktop at 100% scaling — a real owner's screen. WIDE viewports are their own
+  // failure mode: the balance-sheet `.sheet-sides` grid (auto-fit minmax) behaves differently when
+  // there is lots of horizontal room, and an owner reported asset-group values running clean off
+  // the right edge here. The narrow viewports never exercised this.
+  { name: 'desktop-1920x1080', width: 1920, height: 1080 },
   // A 1080p shop PC at Windows 150% display scaling — the single most common real config, and
   // the one an owner reported numbers running "off the screen and sticking together" on. At 150%
   // the app sees ~853 effective CSS px, which is where a card that refuses to shrink pushes its

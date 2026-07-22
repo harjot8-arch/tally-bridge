@@ -15,10 +15,10 @@
 // libsodium's wasm embeds as base64 inside its own JS (verified for the server bundle), so there
 // is no external .wasm to serve and no fetch at load.
 //
-// CORRECTION: an earlier version of this comment claimed "the CSP forbids remote fetches anyway".
-// That was FALSE — the Vercel deployment sets no headers at all (config.json has no `headers`
-// block); the only CSP in this repo is the Electron window's. The embedded wasm is therefore a
-// property of libsodium, not something a policy is enforcing. Adding real headers is tracked.
+// The embedded wasm is a property of libsodium, not a policy: even so, the deploy bundle now
+// serves a CSP (scripts/deploy-bundle/build.ts) and that CSP MUST include 'wasm-unsafe-eval' in
+// script-src, or this very wasm refuses to instantiate in the browser and sign-in dies. There is
+// no external .wasm to serve and no fetch at load, so nothing here depends on connect-src.
 //
 // Run: `npm run build` in apps/web (or `node build.mjs`). Requires esbuild (already a devDep).
 

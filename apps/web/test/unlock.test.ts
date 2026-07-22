@@ -179,6 +179,37 @@ test('a 503 (server not set up) is reported as such, not as bad credentials', as
   );
 });
 
+test('a crypto-engine failure DURING DERIVE is an engine fault, never a wrong passphrase', async () => {
+  const fx = await makeFixture();
+  // The wasm refusing to instantiate (a deployment CSP missing 'wasm-unsafe-eval') surfaces as a
+  // WorkerError out of the derive seam. The derive never checks the passphrase, so this must be
+  // 'server' (engine), not 'credentials' — telling the owner "wrong passphrase" would be a lie.
+  const boom = () => {
+    const e = new Error('wasm refused');
+    e.name = 'WorkerError';
+    return Promise.reject<Uint8Array>(e);
+  };
+  await assert.rejects(
+    () => unlock({ fetch: fakeServer(fx), storage: spyKV(), deriveAuthToken: boom }, TENANT, PASSPHRASE),
+    (e: unknown) => e instanceof UnlockError && e.failure === 'server' && /engine/.test(e.message),
+  );
+});
+
+test('a worker fault DURING IDENTITY-OPEN is an engine fault, not "wrong passphrase"', async () => {
+  const fx = await makeFixture();
+  // Real derive + real login succeed (correct passphrase), then the open seam dies. Without the
+  // WorkerError check, the openPass catch would map this to 'credentials' and blame the owner.
+  const boom = () => {
+    const e = new Error('worker died');
+    e.name = 'WorkerError';
+    return Promise.reject<never>(e);
+  };
+  await assert.rejects(
+    () => unlock({ fetch: fakeServer(fx), storage: spyKV(), openPassIdentity: boom }, TENANT, PASSPHRASE),
+    (e: unknown) => e instanceof UnlockError && e.failure === 'server' && /engine/.test(e.message),
+  );
+});
+
 test('the STAGE callback fires the expensive steps in order, so the UI can warn about the wait', async () => {
   const fx = await makeFixture();
   const stages: string[] = [];

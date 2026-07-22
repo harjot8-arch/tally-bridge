@@ -160,9 +160,18 @@ export async function unlock(deps: UnlockDeps, tenantId: string, passphrase: str
   stage('contacting');
   const params = await mapApi(prelogin(deps.fetch, cleanTenant), 'prelogin');
 
-  // 2–3. The expensive derive, then login.
+  // 2–3. The expensive derive, then login. A failure HERE is never a wrong passphrase — the
+  // derive does not check the passphrase, it only runs Argon2id — so a throw means the crypto
+  // engine (libsodium wasm in the worker) could not run. Surface that as its own fault, not as
+  // "something went wrong": on a deployment whose CSP forgot 'wasm-unsafe-eval' this is exactly
+  // where sign-in dies, and the owner needs a message that points at the engine, not their memory.
   stage('deriving');
-  const authToken = await deriveAuth(passphrase, params);
+  let authToken: Uint8Array;
+  try {
+    authToken = await deriveAuth(passphrase, params);
+  } catch (e) {
+    throw engineFault(e, 'deriving your key');
+  }
   let authTokenB64: string;
   try {
     authTokenB64 = toBase64(authToken);
@@ -202,6 +211,12 @@ export async function unlock(deps: UnlockDeps, tenantId: string, passphrase: str
       // The AEAD tag verified and THEN the bundle was refused (no roster / malformed roster).
       // That is a setup or attack condition, never a typo — do not call it one.
       throw new UnlockError('not-set-up', (e as Error).message);
+    }
+    if ((e as Error).name === 'WorkerError') {
+      // The worker died (wasm refused, worker load failed) mid-open. That is an engine fault, not
+      // a wrong passphrase — mapping it to 'credentials' would send the owner chasing a typo that
+      // does not exist. This is the mislabel the openPass default below would otherwise produce.
+      throw engineFault(e, 'opening your identity');
     }
     // AEAD failure: login succeeded under prelogin's salt but the blob's own params disagree —
     // the one state where a wrong passphrase surfaces here rather than at login.
@@ -262,6 +277,18 @@ async function mapApi<T>(p: Promise<T>, what: string): Promise<T> {
   } catch (e) {
     throw mapApiError(e, what);
   }
+}
+
+/**
+ * A crypto-engine failure (worker died, wasm refused to instantiate) → a plain sentence that
+ * points at the engine, NOT at the passphrase. Reuses 'server' (the UI switches on the message,
+ * not the kind) and appends the short underlying reason so a deployment problem is diagnosable
+ * without a stack trace ever reaching the owner.
+ */
+function engineFault(e: unknown, step: string): UnlockError {
+  if (e instanceof UnlockError) return e;
+  const detail = e instanceof Error && e.message ? ` (${e.message})` : '';
+  return new UnlockError('server', `the sign-in engine could not start while ${step}${detail}`);
 }
 
 function mapApiError(e: unknown, what: string): UnlockError {

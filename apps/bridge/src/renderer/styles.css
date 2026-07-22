@@ -825,8 +825,11 @@ body {
 
 .tree-row { padding-left: calc(var(--depth) * 18px); }
 
-.tree-toggle,
-.tree-row > .caret {
+/* ONLY the toggle button. It once also matched `.tree-row > .caret`, which silently gave a LEAF
+   row's caret `width: 100%` — and because `.caret` is `flex: none`, that non-shrinking full-width
+   spacer shoved the value clean off the right edge of the panel (visible as asset figures running
+   off-screen at wide widths). A leaf caret is just the 12px spacer `.caret` defines; nothing else. */
+.tree-toggle {
   display: flex;
   align-items: center;
   gap: 8px;

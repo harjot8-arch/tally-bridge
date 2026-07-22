@@ -146,7 +146,10 @@ const EN = {
   s2_progress_calm: 'This takes about a minute. You can leave this window open.',
   s2_neon_title: 'One click, then come back',
   s2_neon_body:
-    'We will open a page for the database your dashboard needs. Click “Install” there, then come back here — this window carries on by itself.',
+    'Your dashboard needs a free database called Neon. We just opened its page in your browser — here is exactly what to do there:',
+  s2_neon_step1: '1.  If Vercel asks you to sign in, sign in with the same account.',
+  s2_neon_step2: '2.  Click the “Install” button, then confirm with “Install” once more.',
+  s2_neon_step3: '3.  Come back to this window — you are done. It continues on its own.',
   s2_neon_waiting: 'Waiting for you to click Install…',
   s2_problem_title: 'That did not work',
 
@@ -247,7 +250,10 @@ const HI: Strings = {
   s2_progress_calm: 'इसमें लगभग एक मिनट लगेगा। यह विंडो खुली रहने दें।',
   s2_neon_title: 'एक क्लिक, फिर यहाँ लौटें',
   s2_neon_body:
-    'हम उस डेटाबेस का पेज खोलेंगे जो आपके डैशबोर्ड के लिए ज़रूरी है। वहाँ “Install” पर क्लिक करें, फिर यहाँ लौट आएँ — आगे का काम यह विंडो खुद कर लेगी।',
+    'आपके डैशबोर्ड के लिए “Neon” नाम का एक मुफ़्त डेटाबेस चाहिए। हमने उसका पेज आपके ब्राउज़र में खोल दिया है — वहाँ बस इतना करें:',
+  s2_neon_step1: '1.  अगर Vercel साइन-इन माँगे, तो उसी अकाउंट से साइन-इन करें।',
+  s2_neon_step2: '2.  “Install” बटन दबाएँ, फिर एक बार और “Install” दबाकर पुष्टि करें।',
+  s2_neon_step3: '3.  इस विंडो में लौट आएँ — बस हो गया। बाकी काम यह खुद कर लेगी।',
   s2_neon_waiting: 'आपके Install पर क्लिक करने का इंतज़ार…',
   s2_problem_title: 'यह नहीं हो सका',
 
@@ -616,7 +622,12 @@ export function describeWizard(
           return {
             ...head,
             title: t(lang, 's2_neon_title'),
-            body: [t(lang, 's2_neon_body')],
+            body: [
+              t(lang, 's2_neon_body'),
+              t(lang, 's2_neon_step1'),
+              t(lang, 's2_neon_step2'),
+              t(lang, 's2_neon_step3'),
+            ],
             tone: 'calm',
             progress: { percent: progressPercent('await_neon_install'), label: t(lang, 's2_neon_waiting') },
             action: {
