@@ -328,6 +328,43 @@ test('locked with no unlock handler still says what is true, with no dead button
   dash.destroy();
 });
 
+test('an unlocked dashboard offers Lock; clicking it re-locks and clears the figures', async () => {
+  const root = container();
+  let locked = false;
+  let lockCalls = 0;
+  const dash = mountDashboard(root as unknown as Element, {
+    bridge: fakeBridge({
+      lock: async () => {
+        lockCalls++;
+        locked = true;
+      },
+      // The board is unlocked until lock() flips it — then getCards reports 'locked', exactly as
+      // the main process does once the session key is zeroed.
+      getCards: async () => (locked ? { state: 'locked' } : ready([acme()])),
+    }),
+    now: () => 1_000_000,
+    onUnlockRequested: () => {},
+  });
+  await dash.refresh();
+
+  // Unlocked: the Lock (log out) button is present. Locking a locked board is meaningless, so it
+  // must be ABSENT in the locked state — proven below after the click.
+  const lock = byClass(root, 'status-action').find((b) => b.textContent === 'Lock');
+  assert.ok(lock, 'Lock button should show when unlocked');
+
+  lock!.click();
+  await settle();
+
+  assert.equal(lockCalls, 1, 'clicking Lock must call bridge.lock()');
+  assert.equal(
+    byClass(root, 'status-action').some((b) => b.textContent === 'Lock'),
+    false,
+    'no Lock button once the board is locked',
+  );
+  assert.ok(allText(root).includes('locked'), 'the figures are gone; the locked state shows');
+  dash.destroy();
+});
+
 test('an incomplete payload says some figures are missing', async () => {
   const root = container();
   const dash = mountDashboard(root as unknown as Element, {

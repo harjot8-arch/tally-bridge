@@ -222,6 +222,8 @@ window.bridge = {
   onStatusChanged: () => {},
   syncNow: async () => {},
   getCards: async () => (${JSON.stringify(CARDS)}),
+  unlock: async () => true,
+  lock: async () => {},
   openExternal: async () => {},
   getMobileAccess: async () => (${JSON.stringify(MOBILE)}),
 };

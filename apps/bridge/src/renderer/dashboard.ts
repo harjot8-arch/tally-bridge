@@ -196,6 +196,20 @@ export function mountDashboard(container: Element, options: DashboardOptions = {
     const b = button('status-action primary', label, () => void sync());
     b.disabled = syncing;
     mount(strip, b);
+
+    // Lock (log out): only meaningful once UNLOCKED — locking an already-locked dashboard is a
+    // no-op, so the button is absent in the locked state (which shows its own Unlock action).
+    // Re-locking zeroes the identity key in the main process; refresh() then repaints as locked.
+    if (model && model.state !== 'locked') {
+      const lock = button('status-action', t('action.lock'), () => void lockSession());
+      lock.disabled = syncing;
+      mount(strip, lock);
+    }
+  }
+
+  async function lockSession(): Promise<void> {
+    await ask(() => bridge.lock(), undefined);
+    await refresh(); // getCards now returns 'locked' -> the cards clear
   }
 
   function languageToggle(): HTMLElement {

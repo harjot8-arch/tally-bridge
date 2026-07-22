@@ -138,6 +138,7 @@ const en = {
 
   'locked.body': 'Your data is locked. Enter your passphrase to see your figures.',
   'locked.action': 'Unlock',
+  'action.lock': 'Lock',
   'unlock.title': 'Enter your passphrase',
   'unlock.sub': 'This unlocks your figures on this computer. It takes a few seconds.',
   'unlock.placeholder': 'Passphrase',
@@ -248,6 +249,7 @@ const hi: Partial<Record<StringKey, string>> = {
 
   'locked.body': 'आपका डेटा लॉक है। आँकड़े देखने के लिए अपना पासफ़्रेज़ डालें।',
   'locked.action': 'अनलॉक करें',
+  'action.lock': 'लॉक करें',
   'unlock.title': 'अपना पासफ़्रेज़ डालें',
   'unlock.sub': 'यह इस कंप्यूटर पर आपके आँकड़े खोलता है। इसमें कुछ सेकंड लगते हैं।',
   'unlock.placeholder': 'पासफ़्रेज़',

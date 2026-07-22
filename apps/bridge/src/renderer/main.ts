@@ -223,7 +223,19 @@ function promptUnlock(host: HTMLElement): void {
       close();
       void dashboard?.refresh(); // now unlocked -> the cards render
     } else {
-      error.textContent = t('unlock.wrong');
+      // A failed unlock is USUALLY a typo — but it can also be "setup not finished on this PC", a
+      // cooldown after too many tries, or a damaged key. The session names those provably-not-the-
+      // passphrase reasons in `problem` (and leaves it undefined for a genuine wrong passphrase,
+      // which must stay indistinguishable). Surface the real reason so the owner is not re-typing a
+      // correct passphrase forever against a problem that was never the passphrase.
+      let message = t('unlock.wrong');
+      try {
+        const cards = await window.bridge.getCards();
+        if (cards.state === 'locked' && cards.problem) message = cards.problem;
+      } catch {
+        /* keep the generic message — a getCards failure must not block the retry */
+      }
+      error.textContent = message;
       input.focus();
     }
   }
