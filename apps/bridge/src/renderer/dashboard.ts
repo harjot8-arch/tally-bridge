@@ -1,10 +1,11 @@
-import type { BridgeApi, GetCardsResult } from '../main/ipc.ts';
+import type { BridgeApi, GetCardsResult, MobileAccess } from '../main/ipc.ts';
 import type { SyncStatus } from '../main/scheduler.ts';
 import {
   renderAgeing,
   renderCashBank,
   renderDutiesTaxes,
   renderEmpty,
+  renderMobileAccess,
   renderProfit,
   renderSheet,
   renderStock,
@@ -121,6 +122,8 @@ export function mountDashboard(container: Element, options: DashboardOptions = {
   let status: SyncStatus = { state: 'never', message: 'Not synced yet' };
   let model: DashboardModel | undefined;
   let selectedGuid: string | undefined;
+  /** The phone-access details (URL, Tally ID, QR). Constant once provisioned; fetched in refresh. */
+  let mobileAccess: MobileAccess | null = null;
   let syncing = false;
   let destroyed = false;
   /**
@@ -348,6 +351,13 @@ export function mountDashboard(container: Element, options: DashboardOptions = {
 
     if (cards?.balanceSheet?.length) addRow('solo', [renderSheet(cards.balanceSheet, t)]);
 
+    // The same figures on the owner's phone, via the web dashboard they deployed. A full-width
+    // row at the foot: it is an ACTION (set up your phone), not a figure, so it sits after the
+    // numbers rather than among them. Absent until the deployment exists.
+    if (mobileAccess) {
+      addRow('solo', [renderMobileAccess(mobileAccess, t, (url) => void bridge.openExternal(url))]);
+    }
+
     // Mark the grid stale when the numbers are not current. The BANNER carries the message in
     // words; this class is a styling hook and a test surface, deliberately without a heavy
     // visual treatment — greying out the owner's real (if older) numbers read as "broken".
@@ -401,6 +411,13 @@ export function mountDashboard(container: Element, options: DashboardOptions = {
     // rejected. `buildModel` turns it into `unavailable`, which has its own sentence, rather
     // than letting it read as "no data yet".
     const payload = await ask<GetCardsResult | null>(() => bridge.getCards(), null);
+    // Phone-access details. Constant once provisioned, so the previous value is the fallback — a
+    // transient IPC failure must not blank a card that was showing a moment ago. `ask` swallows
+    // the TypeError if a test's fake bridge omits the (optional) method.
+    const nextMobile = await ask<MobileAccess | null>(
+      () => (bridge.getMobileAccess ? bridge.getMobileAccess() : Promise.resolve(null)),
+      mobileAccess,
+    );
     if (destroyed) return;
     // A newer refresh has already answered. Drop this one whole — its status and its cards are
     // a matched pair, and committing either half over a newer answer is a desynchronised
@@ -413,6 +430,7 @@ export function mountDashboard(container: Element, options: DashboardOptions = {
     status = nextStatus;
     model = buildModel(payload, selectedGuid);
     selectedGuid = model.selected;
+    mobileAccess = nextMobile;
     paint();
   }
 

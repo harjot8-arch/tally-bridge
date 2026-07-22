@@ -37,6 +37,7 @@ export const CHANNELS = {
   detectTally: 'bridge:detectTally',
   listCompanies: 'bridge:listCompanies',
   openExternal: 'bridge:openExternal',
+  getMobileAccess: 'bridge:getMobileAccess',
   statusChanged: 'bridge:statusChanged',
   getWizardState: 'bridge:getWizardState',
   sendWizardEvent: 'bridge:sendWizardEvent',
@@ -107,6 +108,13 @@ export type GetCardsResult =
   | { state: 'error'; message: string }
   | { state: 'ready'; companies: CompanyCards[]; incomplete: boolean };
 
+/** What the "View on your phone" card needs. The QR is a raster PNG data URL of `url`. */
+export interface MobileAccess {
+  url: string;
+  tenantId: string;
+  qr: string;
+}
+
 export interface BridgeApi {
   getStatus(): Promise<SyncStatus>;
   syncNow(): Promise<void>;
@@ -118,6 +126,14 @@ export interface BridgeApi {
   getCards(): Promise<GetCardsResult>;
   /** Main-process side validates the URL against an allowlist; this is not a general opener. */
   openExternal(url: string): Promise<void>;
+  /**
+   * The details an owner needs to open THIS dashboard on their phone: the deployed URL, their
+   * Tally ID (the login), and a PNG-data-URL QR of the URL. Returns null before the deployment
+   * exists. Nothing secret crosses — the URL is public and the passphrase is never involved.
+   *
+   * Optional so a test's fake bridge need not implement it; the preload always provides it.
+   */
+  getMobileAccess?(): Promise<MobileAccess | null>;
   onStatusChanged(cb: (s: SyncStatus) => void): () => void;
 
   // ---- Setup wizard. The STATE MACHINE runs in the main process; the renderer is a view. ----

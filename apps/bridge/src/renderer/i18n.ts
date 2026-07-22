@@ -122,6 +122,12 @@ const en = {
   'sheet.liabilities': 'What you owe',
   'sheet.nil': 'Nil balance: {names}',
 
+  'card.mobile': 'View on your phone',
+  'mobile.hint': 'Scan this on your phone, or open the link. Sign in with your Tally ID and passphrase.',
+  'mobile.tallyId': 'Tally ID',
+  'mobile.open': 'Open dashboard',
+  'mobile.qrAlt': 'QR code that opens your dashboard',
+
   'company.switch': 'Company',
 
   'error.card': 'This card could not be read from the last sync.',
@@ -225,6 +231,12 @@ const hi: Partial<Record<StringKey, string>> = {
   'sheet.assets': 'आपके पास क्या है',
   'sheet.liabilities': 'आप पर क्या बाकी है',
   'sheet.nil': 'शून्य शेष: {names}',
+
+  'card.mobile': 'फ़ोन पर देखें',
+  'mobile.hint': 'अपने फ़ोन पर इसे स्कैन करें, या लिंक खोलें। अपनी Tally ID और पासफ़्रेज़ से साइन इन करें।',
+  'mobile.tallyId': 'Tally ID',
+  'mobile.open': 'डैशबोर्ड खोलें',
+  'mobile.qrAlt': 'आपका डैशबोर्ड खोलने वाला QR कोड',
 
   'company.switch': 'कंपनी',
 

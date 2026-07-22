@@ -110,24 +110,28 @@ async function startFakeTally(cfg: FakeTallyConfig = {}): Promise<FakeTally> {
       }
 
       if (body.includes('<ID>TSBills</ID>')) {
-        const payable = body.includes('$$GroupSundryCreditors');
+        // The request is now IDENTICAL for both ageing sections — F07 tags each bill's group and
+        // Node classifies (debtor invoices + creditor advances => receivable; the reverse =>
+        // payable). So the fake returns ONE mixed set, each bill carrying its own natural sign, and
+        // there is no per-request flip. A debtor is Dr (negative); a creditor is Cr (positive).
         const rows = cfg.bills ?? [
-          [parties[0]!, '2026-01-01', '30', '-125000.00', '0', '90'],
-          [parties[1]!, '2026-02-01', '0', '-5000.50', '0', '10'],
+          [parties[0]!, '2026-01-01', '30', '-125000.00', '0', '90', '1'], // debtor invoice -> receivable
+          [parties[1]!, '2026-02-01', '0', '-5000.50', '0', '10', '1'], //    debtor invoice -> receivable
+          ['Supplier Co', '2026-03-01', '0', '80000.00', '0', '20', '2'], //  creditor invoice -> payable (Cr +)
         ];
         send(
           '<ENVELOPE>' +
             rows
-              .map(
-                (r) =>
-                  r
-                    .map((v, i) => `<F0${i + 1}>${payable && i === 3 ? flipSign(v) : v}</F0${i + 1}>`)
-                    .join('') +
-                  // F07 is the on-side flag: $$IsLedOfGrp on the party. Every test bill genuinely
-                  // belongs to the group being asked about, so the real Tally would answer 1.
-                  // Without this the request's 7th field is empty and billsForSide drops every row.
-                  `<F07>${cfg.billsOffSide ? '0' : '1'}</F07>`,
-              )
+              .map((r) => {
+                // F07 (the group code) is the row's 7th column, defaulting to debtor for the
+                // 6-column custom fixtures. `billsOffSide` forces 0 for every row, modelling a
+                // Tally where $$IsLedOfGrp never resolves — which must read as a broken extraction.
+                const groupCode = cfg.billsOffSide ? '0' : (r[6] ?? '1');
+                return (
+                  r.slice(0, 6).map((v, i) => `<F0${i + 1}>${v}</F0${i + 1}>`).join('') +
+                  `<F07>${groupCode}</F07>`
+                );
+              })
               .join('') +
             '</ENVELOPE>',
         );
@@ -160,10 +164,6 @@ async function startFakeTally(cfg: FakeTallyConfig = {}): Promise<FakeTally> {
     countOf: (id) => requests.filter((b) => b.includes(`<ID>${id}</ID>`)).length,
     close: () => new Promise<void>((r) => server.close(() => r())),
   };
-}
-
-function flipSign(v: string): string {
-  return v.startsWith('-') ? v.slice(1) : `-${v}`;
 }
 
 // ---------------------------------------------------------------- harness
@@ -434,15 +434,17 @@ test('ageing buckets by days OVERDUE and totals cover every bill', async () => {
   }
 });
 
-test('payables are the same path with the other sign', async () => {
+test('payables carry the creditor bills — a creditor invoice is Cr positive, on the payable side', async () => {
   const tally = await startFakeTally();
   const h = await harness({ port: tally.port });
   try {
     await h.cycle();
     const payable = await open(h, 'ageing_payable');
-    const rows = payable.rows as Array<{ side: string; amount: string }>;
+    const rows = payable.rows as Array<{ side: string; amount: string; partyName: string }>;
     assert.ok(rows.every((r) => r.side === 'payable'));
-    assert.ok(rows.some((r) => r.amount === '125000.00'), 'Cr positive');
+    // The default fixture's one creditor invoice (F07=2) classifies to payables and keeps its Cr
+    // sign — the two debtor bills (F07=1) went to receivables, not here.
+    assert.ok(rows.some((r) => r.partyName === 'Supplier Co' && r.amount === '80000.00'), 'Cr positive');
   } finally {
     h.cleanup();
     await tally.close();

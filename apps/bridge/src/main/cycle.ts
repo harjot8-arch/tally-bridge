@@ -555,7 +555,11 @@ async function ageingSection(
   // TallyPrime 7.0 (see the note on `billsRequest`), so both cuts happen here. `bills`, not
   // the filtered set, is what gets asserted above — a side test that discarded everything must
   // read as a broken extraction, never as a company that owes nothing.
-  const agg = aggregateAgeing(billsForSide(bills), {
+  // `billsForSide(bills, side)` keeps the bills that CLASSIFY to this side — debtor invoices +
+  // creditor advances for receivables, creditor invoices + debtor advances for payables. Both
+  // sections fetch the same rows (F07 tags the group) and each keeps its own; advances land on the
+  // opposite side from their group, shown separately rather than netted. See `classify`.
+  const agg = aggregateAgeing(billsForSide(bills, side), {
     companyGuid: info.companyGuid,
     asOf,
     side,

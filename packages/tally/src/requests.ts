@@ -205,7 +205,6 @@ export function billsRequest(opts: {
 }): string {
   const collectionType = opts.collectionType ?? 'Bills';
   const partyMethod = opts.partyMethod ?? '$LedgerName';
-  const group = opts.side === 'receivable' ? '$$GroupSundryDebtors' : '$$GroupSundryCreditors';
 
   return buildRequest({
     id: 'TSBills',
@@ -228,8 +227,18 @@ export function billsRequest(opts: {
       // treats a negative/absurd age as UNKNOWN rather than ancient. The amount still counts in
       // the total — only the ageing bucket is withheld, because a bill with no date has no age.
       { tag: 'F06', set: 'if $$IsEmpty:$BillDate then -1 else $$Number:($$Date:##SVToDate - $BillDate)' },
-      // WHICH SIDE this bill is on, as a FIELD rather than as a collection filter. See below.
-      { tag: 'F07', set: `if $$IsLedOfGrp:${partyMethod}:${group} then 1 else 0` },
+      // WHICH GROUP this bill's party is in, as a FIELD rather than a collection filter (CHILDOF
+      // empties the collection on a real TallyPrime). 1 = Sundry Debtors, 2 = Sundry Creditors,
+      // 0 = neither. Node then routes the bill to a SIDE by (group, isAdvance): a customer advance
+      // (debtor + advance) is a liability and belongs in PAYABLES; a supplier advance (creditor +
+      // advance) is an asset and belongs in RECEIVABLES. So both sections fetch the same rows and
+      // each keeps the ones that classify to it — see `classify`/`billsForSide` in ageing.ts.
+      {
+        tag: 'F07',
+        set:
+          `if $$IsLedOfGrp:${partyMethod}:$$GroupSundryDebtors then 1 ` +
+          `else if $$IsLedOfGrp:${partyMethod}:$$GroupSundryCreditors then 2 else 0`,
+      },
     ],
     collection: {
       type: collectionType,

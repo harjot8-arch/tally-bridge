@@ -16,6 +16,7 @@ import { formatMoney } from '@tally-bridge/viewmodel';
 import { columnChart, donut, donutCenter, type Column, type Slice } from './charts.ts';
 import { button, clear, el, mount, setVar } from './dom.ts';
 import { monthLabel, type Locale, type StringKey, type T } from './i18n.ts';
+import type { MobileAccess } from '../main/ipc.ts';
 
 /**
  * Card rendering.
@@ -478,6 +479,44 @@ export function renderDutiesTaxes(vm: DutiesTaxesCard, t: T): HTMLElement {
       t,
     ),
   );
+  return c;
+}
+
+// ---------------------------------------------------------------- mobile access
+
+/**
+ * "View on your phone."
+ *
+ * The same figures, on the owner's phone, through the web dashboard they deployed. This card
+ * carries nothing secret: the URL is a public deployment and the Tally ID is a login handle, not
+ * a key — the passphrase is typed on the phone and never leaves it. The QR is a raster PNG data
+ * URL built in the main process (img-src 'self' data: permits it); `.src`, never innerHTML.
+ *
+ * `onOpen` is the shell's `openExternal`, which validates the URL against the allowlist in the
+ * main process — this file never touches `window.bridge` or the network itself.
+ */
+export function renderMobileAccess(access: MobileAccess, t: T, onOpen: (url: string) => void): HTMLElement {
+  const c = card(t('card.mobile'));
+  const body = el('div', 'mobile-body');
+
+  const qr = el('img', 'mobile-qr');
+  qr.src = access.qr; // a data: URL from the main process, never remote
+  qr.alt = t('mobile.qrAlt');
+  qr.width = 128;
+  qr.height = 128;
+
+  const info = el('div', 'mobile-info');
+  mount(info, el('div', 'sub', t('mobile.hint')));
+
+  const idRow = el('div', 'mobile-id');
+  // The Tally ID is a login handle; the owner types it on the phone. Selectable monospace.
+  mount(idRow, el('span', 'mobile-id-label', t('mobile.tallyId')), el('code', 'mobile-id-value', access.tenantId));
+  mount(info, idRow);
+
+  mount(info, button('status-action primary', t('mobile.open'), () => onOpen(access.url)));
+
+  mount(body, qr, info);
+  mount(c, body);
   return c;
 }
 

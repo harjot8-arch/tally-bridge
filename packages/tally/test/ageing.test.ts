@@ -11,6 +11,7 @@ import {
   aggregateAgeing,
   assertBillsLookSane,
   bucketFor,
+  classify,
   parseBillRow,
   billsForSide,
   type RawBill,
@@ -34,7 +35,8 @@ const bill = (over: Partial<RawBill> = {}): RawBill => ({
   creditPeriodDays: 0,
   amountPaise: toPaise(1000),
   isAdvance: false,
-  onSide: true,
+  // A plain debtor invoice by default: classifies to 'receivable'.
+  group: 'debtor',
   ...over,
 });
 
@@ -189,14 +191,14 @@ test('money does not drift across thousands of bills', () => {
 // ---------------------------------------------------------------- row parsing
 
 test('parses a bill row off the wire', () => {
-  const row = parseBillRow(['A & B Traders', '2026-01-01', '30', '125000.00', '0', '90']);
+  const row = parseBillRow(['A & B Traders', '2026-01-01', '30', '125000.00', '0', '90', '1']);
   assert.deepEqual(row, {
     partyName: 'A & B Traders',
     daysSinceBill: 90,
     creditPeriodDays: 30,
     amountPaise: 12500000,
     isAdvance: false,
-    onSide: true,
+    group: 'debtor',
   });
 });
 
@@ -360,50 +362,65 @@ test('a cell key cannot collide across party/bucket boundaries', () => {
 // honest — the failure they guard against is an EMPTY CARD, which looks exactly like a
 // business that is owed nothing.
 
-test('THE SIDE TEST: bills on the other side are dropped, not counted', () => {
-  const kept = billsForSide([
-    bill({ partyName: 'Debtor', amountPaise: 100000, onSide: true }),
-    bill({ partyName: 'Creditor', amountPaise: 250000, onSide: false }),
-  ]);
-  assert.equal(kept.length, 1);
-  assert.equal(kept[0]?.partyName, 'Debtor');
+test('CLASSIFY routes a bill to a side by group + advance — advances flip sides', () => {
+  assert.equal(classify({ group: 'debtor', isAdvance: false }), 'receivable');
+  assert.equal(classify({ group: 'creditor', isAdvance: false }), 'payable');
+  // The rule the owner asked for: a customer (debtor) advance is a LIABILITY (payable); a supplier
+  // (creditor) advance is an ASSET (receivable). Advances land on the OPPOSITE side from the group.
+  assert.equal(classify({ group: 'debtor', isAdvance: true }), 'payable');
+  assert.equal(classify({ group: 'creditor', isAdvance: true }), 'receivable');
+  // A party in neither Sundry group belongs on no side at all.
+  assert.equal(classify({ group: 'other', isAdvance: false }), null);
+});
+
+test('billsForSide keeps only the bills that classify to that side (advances separated, not netted)', () => {
+  const debtorInvoice = bill({ partyName: 'Debtor', amountPaise: 100000, group: 'debtor' });
+  const creditorInvoice = bill({ partyName: 'Creditor', amountPaise: 250000, group: 'creditor' });
+  const customerAdvance = bill({ partyName: 'Prepaid Cust', amountPaise: 40000, group: 'debtor', isAdvance: true });
+  const supplierAdvance = bill({ partyName: 'Prepaid Supp', amountPaise: -30000, group: 'creditor', isAdvance: true });
+  const all = [debtorInvoice, creditorInvoice, customerAdvance, supplierAdvance];
+
+  // Receivables: the debtor invoice + the supplier advance (we prepaid, they owe us) — NOT the
+  // customer advance, which no longer nets the receivable total down.
+  assert.deepEqual(billsForSide(all, 'receivable').map((b) => b.partyName).sort(), ['Debtor', 'Prepaid Supp']);
+  // Payables: the creditor invoice + the customer advance (they prepaid, we owe them).
+  assert.deepEqual(billsForSide(all, 'payable').map((b) => b.partyName).sort(), ['Creditor', 'Prepaid Cust']);
 });
 
 test('settled bills are dropped in Node, because Tally will not filter them', () => {
   // This WAS `<FILTER>NOT $$IsZero:$ClosingBalance</FILTER>`. On a real Tally that filter
   // returned zero rows out of 141 while every one of those 141 carried a non-zero balance.
-  const kept = billsForSide([
-    bill({ amountPaise: 0 }),
-    bill({ amountPaise: -1 }),
-    bill({ amountPaise: 500 }),
-  ]);
+  const kept = billsForSide(
+    [bill({ amountPaise: 0 }), bill({ amountPaise: -1 }), bill({ amountPaise: 500 })],
+    'receivable',
+  );
   assert.equal(kept.length, 2);
 });
 
-test('an ABSENT side column means keep, never drop', () => {
-  // A Tally that does not answer F07 must degrade to the old behaviour, not to an empty card.
-  const parsed = parseBillRow(['Party', '2026-01-01', '30', '1000.00', '0', '40']);
-  assert.equal(parsed?.onSide, true);
-  assert.equal(billsForSide([parsed!]).length, 1);
+test('a bill in NEITHER group belongs to no side and is dropped', () => {
+  // F07 = 0 (or absent) means $$IsLedOfGrp did not place the party. It cannot be sided, so it is
+  // dropped from both sides — and if EVERY row is like this, assertBillsLookSane refuses the sync.
+  const parsed = parseBillRow(['Party', '2026-01-01', '30', '1000.00', '0', '40', '0']);
+  assert.equal(parsed?.group, 'other');
+  assert.equal(billsForSide([parsed!], 'receivable').length, 0);
+  assert.equal(billsForSide([parsed!], 'payable').length, 0);
 });
 
-test('F07 is read from the wire: "1" is on-side, anything else is not', () => {
-  const on = parseBillRow(['P', 'd', '0', '1.00', '0', '5', '1']);
-  const off = parseBillRow(['P', 'd', '0', '1.00', '0', '5', '0']);
-  assert.equal(on?.onSide, true);
-  assert.equal(off?.onSide, false);
+test('F07 group code is read from the wire: 1 debtor, 2 creditor, else other', () => {
+  assert.equal(parseBillRow(['P', 'd', '0', '1.00', '0', '5', '1'])?.group, 'debtor');
+  assert.equal(parseBillRow(['P', 'd', '0', '1.00', '0', '5', '2'])?.group, 'creditor');
+  assert.equal(parseBillRow(['P', 'd', '0', '1.00', '0', '5', '0'])?.group, 'other');
+  assert.equal(parseBillRow(['P', 'd', '0', '1.00', '0', '5'])?.group, 'other'); // absent column
 });
 
-test('A BROKEN SIDE TEST IS LOUD: no bill on either side cannot mean "owed nothing"', () => {
-  // If $$IsLedOfGrp does not resolve on a bill, F07 is 0 for EVERY row and the card silently
-  // empties. A book where not one bill belongs to any party group does not exist — so this
+test('A BROKEN GROUP TEST IS LOUD: no bill in either group cannot mean "owed nothing"', () => {
+  // If $$IsLedOfGrp does not resolve on a bill, F07 is 0 (other) for EVERY row and both cards
+  // silently empty. A book where not one bill is a debtor or creditor does not exist — so this
   // shape is always a broken extraction, and must never reach a dashboard.
-  const bills = [bill({ partyName: 'Real', onSide: false }), bill({ partyName: 'Also Real', onSide: false })];
-  assert.throws(() => assertBillsLookSane(bills), /NOT ONE is in the group/);
+  const bills = [bill({ partyName: 'Real', group: 'other' }), bill({ partyName: 'Also Real', group: 'other' })];
+  assert.throws(() => assertBillsLookSane(bills), /NOT ONE is in Sundry/);
 });
 
-test('the side gate does not fire when even one bill is on-side', () => {
-  assert.doesNotThrow(() =>
-    assertBillsLookSane([bill({ onSide: false }), bill({ onSide: true })]),
-  );
+test('the group gate does not fire when even one bill is a debtor or creditor', () => {
+  assert.doesNotThrow(() => assertBillsLookSane([bill({ group: 'other' }), bill({ group: 'debtor' })]));
 });

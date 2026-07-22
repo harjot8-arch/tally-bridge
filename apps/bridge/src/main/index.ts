@@ -10,7 +10,7 @@ import { humanError } from './errors.ts';
 import { buildCycle } from './cycle.ts';
 import { createSecureWindow, hardenApp } from './window.ts';
 import { safeExternalUrl } from './urls.ts';
-import { CHANNELS, type GetCardsResult } from './ipc.ts';
+import { CHANNELS, type GetCardsResult, type MobileAccess } from './ipc.ts';
 import { CapturingSyncStore, RosterMarkStore, SnapshotStore } from './snapshots.ts';
 import { UnlockSession } from './session.ts';
 import { buildCards } from './reader.ts';
@@ -636,6 +636,19 @@ function registerIpc(): void {
     const safe = safeExternalUrl(url);
     if (!safe) return;
     await shell.openExternal(safe);
+  });
+
+  /**
+   * The details for opening this dashboard on a phone. Nothing secret: the deployment URL is
+   * public and the Tally ID is a login handle, not a key — the passphrase is never involved and
+   * never crosses. Returns null until the deployment exists. The QR encodes the URL only.
+   */
+  ipcMain.handle(CHANNELS.getMobileAccess, async (): Promise<MobileAccess | null> => {
+    const url = keystore?.getServerUrl();
+    const tenantId = keystore?.getTenantId();
+    if (!url || !tenantId) return null;
+    const qr = await QRCode.toDataURL(url, { errorCorrectionLevel: 'M', margin: 2, width: 512 });
+    return { url, tenantId, qr };
   });
 }
 

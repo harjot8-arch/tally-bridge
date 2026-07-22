@@ -916,6 +916,39 @@ body {
   50% { opacity: 0.45; }
 }
 
+/* ---------------------------------------------------------------- view on your phone */
+
+.mobile-body {
+  display: flex;
+  gap: clamp(20px, 3vw, 44px);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.mobile-qr {
+  width: 128px;
+  height: 128px;
+  flex: none;
+  /* The QR stays crisp black-on-white in BOTH themes — a scanner needs the contrast, so it is
+     never inverted or tinted. The white card is the quiet exception to the dark ground. */
+  background: #ffffff;
+  padding: 8px;
+  border: 1px solid var(--border-strong);
+}
+.mobile-info { display: flex; flex-direction: column; gap: 14px; min-width: 0; flex: 1; }
+.mobile-id { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mobile-id-label {
+  font-size: 0.66rem; font-weight: 650; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted);
+}
+.mobile-id-value {
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
+  font-size: 14px; color: var(--text); user-select: all;
+  background: var(--bg); padding: 5px 9px; border: 1px solid var(--border);
+}
+:root[lang="hi"] .mobile-id-label { text-transform: none; letter-spacing: 0; font-size: 0.8rem; }
+/* The mobile card's action hugs the left, unlike the sync strip's right-aligned primary. */
+.mobile-info .status-action.primary { align-self: flex-start; margin-left: 0; }
+
 /* ---------------------------------------------------------------- motion */
 
 /*

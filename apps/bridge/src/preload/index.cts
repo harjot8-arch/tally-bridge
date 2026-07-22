@@ -49,6 +49,7 @@ const CHANNELS = {
   detectTally: 'bridge:detectTally',
   listCompanies: 'bridge:listCompanies',
   openExternal: 'bridge:openExternal',
+  getMobileAccess: 'bridge:getMobileAccess',
   statusChanged: 'bridge:statusChanged',
   getWizardState: 'bridge:getWizardState',
   sendWizardEvent: 'bridge:sendWizardEvent',
@@ -91,6 +92,7 @@ const api: BridgeApi = {
   lock: () => ipcRenderer.invoke(CHANNELS.lock),
   getCards: () => ipcRenderer.invoke(CHANNELS.getCards),
   openExternal: (url: string) => ipcRenderer.invoke(CHANNELS.openExternal, url),
+  getMobileAccess: () => ipcRenderer.invoke(CHANNELS.getMobileAccess),
 
   onStatusChanged: (cb: (s: SyncStatus) => void) => subscribe(CHANNELS.statusChanged, cb),
 
