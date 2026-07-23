@@ -138,7 +138,10 @@ const EN = {
   s2_identity_body: 'Preparing the lock for your figures.',
   s2_token_title: 'Connect your Vercel account',
   s2_token_body:
-    'We will open Vercel in your browser. Copy the code it shows you and paste it here. This is the one thing we cannot do for you.',
+    'We just opened Vercel in your browser. Follow these steps there, then come back — this is the one thing we cannot do for you:',
+  s2_token_step1: '1.  If Vercel asks you to sign in, sign in with the same account.',
+  s2_token_step2: '2.  Click “Create Token”, give it any name, pick “No Expiration”, then click “Create”.',
+  s2_token_step3: '3.  Copy the code it shows and paste it below.',
   s2_token_label: 'Paste the code from Vercel',
   s2_token_open: 'Open Vercel',
   s2_token_submit: 'Continue',
@@ -242,7 +245,10 @@ const HI: Strings = {
   s2_identity_body: 'आपके आँकड़ों का ताला तैयार किया जा रहा है।',
   s2_token_title: 'अपना Vercel खाता जोड़ें',
   s2_token_body:
-    'हम आपके ब्राउज़र में Vercel खोलेंगे। वहाँ दिखने वाला कोड कॉपी करके यहाँ चिपकाएँ। यह एक काम हम आपके लिए नहीं कर सकते।',
+    'हमने आपके ब्राउज़र में Vercel खोल दिया है। वहाँ ये चरण पूरे करें, फिर यहाँ लौटें — यह एक काम हम आपके लिए नहीं कर सकते:',
+  s2_token_step1: '1.  अगर Vercel साइन-इन माँगे, तो उसी अकाउंट से साइन-इन करें।',
+  s2_token_step2: '2.  “Create Token” दबाएँ, कोई भी नाम दें, “No Expiration” चुनें, फिर “Create” दबाएँ।',
+  s2_token_step3: '3.  दिखने वाला कोड कॉपी करके नीचे चिपकाएँ।',
   s2_token_label: 'Vercel से मिला कोड यहाँ चिपकाएँ',
   s2_token_open: 'Vercel खोलें',
   s2_token_submit: 'आगे बढ़ें',
@@ -587,7 +593,12 @@ export function describeWizard(
           return {
             ...head,
             title: t(lang, 's2_token_title'),
-            body: [t(lang, 's2_token_body')],
+            body: [
+              t(lang, 's2_token_body'),
+              t(lang, 's2_token_step1'),
+              t(lang, 's2_token_step2'),
+              t(lang, 's2_token_step3'),
+            ],
             tone: 'calm',
             notes: [cost],
             fields: [{ id: 'token', label: t(lang, 's2_token_label'), kind: 'token' }],
