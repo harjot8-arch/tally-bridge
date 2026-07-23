@@ -351,10 +351,10 @@ export async function deviceFingerprint(publicKey: Uint8Array): Promise<string> 
       `device public key must be ${sodium.crypto_sign_PUBLICKEYBYTES} bytes, got ${publicKey.length}`,
     );
   }
-  const input = new Uint8Array(publicKey.length + 32);
   const tag = new TextEncoder().encode('tally-bridge/device-fingerprint/v1');
+  const input = new Uint8Array(tag.length + publicKey.length);
   input.set(tag, 0);
-  input.set(publicKey, 32);
+  input.set(publicKey, tag.length);
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', input as BufferSource));
   const hex = Array.from(digest.subarray(0, 8), (b) => b.toString(16).padStart(2, '0'))
     .join('')

@@ -118,3 +118,16 @@ test('a signature made over the table\'s path verifies; one made over a neighbou
   );
   assert.equal(drifted.ok, false, 'a path that drifted by one character must NOT verify');
 });
+
+/**
+ * The set of unauthenticated doors is the first thing an auditor counts, so it is the first
+ * thing that must not silently grow. This pins it: the doc comment on `auth` says exactly these
+ * four, and a fifth open route — the way a real auth-bypass regression looks — turns this red
+ * and forces the "why is this open" answer before it ships.
+ */
+test('exactly four routes are auth:none, and they are the expected four', () => {
+  const open = ALL_ROUTES.filter((r) => r.auth === 'none')
+    .map((r) => r.name)
+    .sort();
+  assert.deepEqual(open, ['health', 'login', 'prelogin', 'register']);
+});

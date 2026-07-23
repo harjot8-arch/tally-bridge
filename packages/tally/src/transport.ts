@@ -59,11 +59,6 @@ export const TIMEOUTS = {
   sectionMs: 60_000,
   /** First-run backfill pulls 12 months serially and is allowed to take longer. */
   backfillMs: 120_000,
-  /**
-   * Idle-socket timeout. Enforced via `req.setTimeout`, NOT merely an outer Promise.race:
-   * racing a promise leaves the socket open, so a hung Tally would leak a socket per attempt.
-   */
-  idleSocketMs: 30_000,
 } as const;
 
 export type TallyFailure =
@@ -310,18 +305,14 @@ export class TallyTransport {
         },
       );
 
-      // Overall deadline. Destroying the request is what actually frees the socket; a bare
-      // timer would leave it hanging in a busy Tally.
+      // Overall deadline, and the ONLY data-phase timer. Destroying the request is what frees
+      // the socket, so a hung Tally cannot leak one — no separate idle-socket timer is needed,
+      // and an idle timer shorter than this deadline would wrongly abort a slow-but-alive pull
+      // (Tally goes silent for well over 30s while building a 12-month backfill).
       const overall = setTimeout(() => {
         req.destroy();
         done({ ok: false, failure: { kind: 'timeout', afterMs: timeoutMs } });
       }, timeoutMs);
-
-      // Idle-socket timeout, distinct from the overall deadline.
-      req.setTimeout(TIMEOUTS.idleSocketMs, () => {
-        req.destroy();
-        done({ ok: false, failure: { kind: 'timeout', afterMs: TIMEOUTS.idleSocketMs } });
-      });
 
       req.on('socket', (socket) => {
         // Connect timeout only applies until the socket is established.

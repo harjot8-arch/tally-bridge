@@ -38,9 +38,10 @@
  *
  *   - `'device'` — Ed25519, RFC 9421, signed by a device key. WRITES only. The Bridge.
  *   - `'session'` — a session cookie held by a human. READS only. The browser.
- *   - `'none'`   — deliberately unauthenticated. There are exactly two, and each is justified
- *                  at its definition, because "why is this open" is the question an auditor will
- *                  ask first and must be able to answer without reading the handler.
+ *   - `'none'`   — deliberately unauthenticated. There are exactly four — `register`, `prelogin`,
+ *                  `login`, and `health` — and each is justified at its definition, because "why is
+ *                  this open" is the question an auditor will ask first and must be able to answer
+ *                  without reading the handler.
  *
  * See read.ts for why the doors do not overlap: a stolen device key must not read the dashboard,
  * and a stolen session must not forge an upload.
