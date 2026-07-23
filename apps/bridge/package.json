@@ -1,6 +1,6 @@
 {
   "name": "@tally-bridge/bridge",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "private": true,
   "type": "module",
   "description": "Tally Bridge — reads a business's books out of Tally, encrypts them at the edge, and pushes them to the owner's own dashboard.",
@@ -42,6 +42,8 @@
     "appId": "com.tallybridge.desktop",
     "productName": "Tally Bridge",
     "electronVersion": "43.1.1",
+    "compression": "maximal",
+    "electronLanguages": ["en-US"],
     "directories": {
       "output": "release"
     },

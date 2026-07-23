@@ -26,6 +26,8 @@
  * way because it only ever needs a bearer token.
  */
 
+import { ROUTES } from '@tally-bridge/protocol';
+
 export interface VercelClientOptions {
   token: string;
   teamId?: string | undefined;
@@ -53,6 +55,7 @@ export type ProvisionStep =
   | 'upload_files'
   | 'deploy'
   | 'await_ready'
+  | 'verify_live'
   | 'done';
 
 export class VercelError extends Error {
@@ -461,6 +464,55 @@ export class VercelClient {
       await this.o.sleep(opts.pollMs);
     }
   }
+
+  /**
+   * Confirm the deployment's API functions actually ANSWER — not just that Vercel built it.
+   *
+   * `awaitDeployReady` returns the instant Vercel reports `READY`, which only means the static
+   * files are served. A prebuilt bundle whose `.func` directories were never mounted (an old
+   * client, or `prebuilt=1` not honoured) is `READY` and serves the dashboard page while every
+   * `/api/*` route 404s — the owner then discovers it later, on their phone, as "something went
+   * wrong". This is the exact failure that shipped: `/api/health` returning `404 NOT_FOUND`.
+   *
+   * The health route is unauthenticated and touches no table, so a 200 `{ok:true}` here proves
+   * the functions are live and a 404 proves they are not. Path and method come from the shared
+   * route table, never a literal — rename the route and this tracks it. Verify it RUNS.
+   */
+  async verifyLive(url: string, opts: { timeoutMs: number; pollMs: number }): Promise<void> {
+    const origin = url.startsWith('http') ? url : `https://${url}`;
+    const target = `${origin}${ROUTES.health.path}`;
+    const deadline = this.o.now() + opts.timeoutMs;
+    let lastStatus = 0;
+    for (;;) {
+      try {
+        const res = await this.o.fetch(target, { method: ROUTES.health.method });
+        lastStatus = res.status;
+        // Always drain the body, even on a non-2xx — an unread response body leaks the socket
+        // into a deployment that may be hung, and in a retry loop those handles accumulate.
+        const text = await res.text().catch(() => '');
+        if (res.ok) {
+          try {
+            if ((JSON.parse(text) as { ok?: boolean }).ok === true) return;
+          } catch {
+            // Body was not the JSON we expected — treat as not-yet-live and retry.
+          }
+        }
+      } catch {
+        // DNS/TLS for a just-created domain can lag a few seconds behind READY — retry.
+        lastStatus = 0;
+      }
+      if (this.o.now() >= deadline) {
+        throw new VercelError(
+          'verify_live',
+          lastStatus,
+          'Your dashboard deployed, but its server is not answering. Please try setup again.',
+          true,
+        );
+      }
+      this.o.log?.({ kind: 'waiting', message: 'Checking your dashboard…' });
+      await this.o.sleep(opts.pollMs);
+    }
+  }
 }
 
 /**
@@ -589,9 +641,15 @@ export async function provision(
     timeoutMs: timings.deployTimeoutMs,
     pollMs: timings.pollMs,
   });
+  const liveUrl = url || dep.url;
+
+  // READY only means the static page serves. Prove the API functions are actually mounted before
+  // telling the owner it is live — a functionless deploy 404s every login and looks like our bug.
+  step('verify_live', 'Checking your dashboard…');
+  await client.verifyLive(liveUrl, { timeoutMs: 60_000, pollMs: timings.pollMs });
 
   step('done', 'Your dashboard is live.');
-  return { projectId: project.id, deploymentUrl: url || dep.url };
+  return { projectId: project.id, deploymentUrl: liveUrl };
 }
 
 /**

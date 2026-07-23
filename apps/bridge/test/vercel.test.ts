@@ -26,6 +26,8 @@ interface FakeOpts {
   deployReadyAfterPolls?: number;
   failWith?: { path: RegExp; status: number };
   hasTeam?: boolean;
+  /** Deploy reports READY but /api/* 404s — a functionless deploy, the bug that shipped. */
+  deadFunctions?: boolean;
 }
 
 function fakeVercel(opts: FakeOpts = {}) {
@@ -48,6 +50,12 @@ function fakeVercel(opts: FakeOpts = {}) {
     }
 
     const json = (b: unknown) => new Response(JSON.stringify(b), { status: 200 });
+
+    // The post-deploy health probe hits the DEPLOYMENT domain, not api.vercel.com, so `path`
+    // is still the full https URL here. A functionless deploy answers 404 on every /api/*.
+    if (path.includes('/api/health')) {
+      return opts.deadFunctions ? new Response('404 NOT_FOUND', { status: 404 }) : json({ ok: true });
+    }
 
     if (path.startsWith('/v2/user')) return json({ user: { username: 'ramesh' } });
     if (path.startsWith('/v2/teams')) {
@@ -150,8 +158,20 @@ test('the happy path provisions end to end', async () => {
   const steps = events.filter((e) => e.kind === 'step').map((e) => (e as { step: string }).step);
   assert.deepEqual(steps, [
     'verify_token', 'check_neon', 'create_project', 'provision_database',
-    'connect_database', 'set_env', 'upload_files', 'deploy', 'await_ready', 'done',
+    'connect_database', 'set_env', 'upload_files', 'deploy', 'await_ready', 'verify_live', 'done',
   ]);
+});
+
+test('a deploy that builds but mounts no functions FAILS setup instead of lying "live"', async () => {
+  // The exact failure that shipped: Vercel says READY, the page loads, and /api/health 404s. If
+  // setup declares success here the owner discovers it later on their phone. It must fail LOUD.
+  const fake = fakeVercel({ deadFunctions: true });
+  const { c } = client(fake);
+  await assert.rejects(
+    () => provision(c, INPUT, TIMINGS, () => {}),
+    (e: unknown) => e instanceof VercelError && e.step === 'verify_live' && e.userActionable,
+  );
+  assert.ok(fake.calls.some((x) => x.includes('/api/health')), 'setup actually probed the API');
 });
 
 test('THE ORDERING RULE: the database is never connected before it is available', async () => {
@@ -480,6 +500,7 @@ function statefulVercel() {
     if (path.includes('/connections')) return json({});
     if (path.includes('/env')) return json({});
     if (path.startsWith('/v2/files')) return json({});
+    if (path.includes('/api/health')) return json({ ok: true });
     if (path.startsWith('/v13/deployments/')) return json({ readyState: 'READY', url: 'acme-dash.vercel.app' });
     if (path.startsWith('/v13/deployments')) {
       if (deployAttempts++ < opts.failDeploys) throw new TypeError('fetch failed');
@@ -599,6 +620,7 @@ test('provision disables Vercel deployment protection (else the phone gets a 401
     if (path.startsWith('/v1/storage/stores/integration/direct')) return json({ store: { id: 's1' } });
     if (path.startsWith('/v1/storage/stores/')) return json({ store: { id: 's1', status: 'available' } });
     if (path.includes('/connections') || path.includes('/env') || path.startsWith('/v2/files')) return json({});
+    if (path.includes('/api/health')) return json({ ok: true });
     if (path.startsWith('/v13/deployments/')) return json({ readyState: 'READY', url: 'x.vercel.app' });
     if (path.startsWith('/v13/deployments')) return json({ id: 'dpl', url: 'x.vercel.app' });
     return json({}, 404);
