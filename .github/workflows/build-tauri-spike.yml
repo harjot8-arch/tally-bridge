@@ -1,0 +1,71 @@
+# Milestone 0 (Windows half): measure the REAL Tauri installer size on Windows/WebView2.
+#
+# The macOS spike proved the shell is ~10 MB with the real crypto frontend embedded, but the app
+# ships on Windows, where the WebView is WebView2 (present on Win10/11, bootstrapped otherwise) and
+# the installer is NSIS/MSI, not a .app. This job builds apps/bridge-tauri on windows-latest and
+# prints the installer size — the number that decides whether the port is worth committing.
+#
+# Run it from the Actions tab: "Build Tauri size spike (Windows)" -> Run workflow. It is
+# workflow_dispatch only — it does not build on tags and publishes no release.
+name: Build Tauri size spike (Windows)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    # windows-latest is fine here: there is NO native node addon to compile (better-sqlite3's ABI
+    # problem that pins the Electron job to windows-2022 does not exist — the Tauri app's I/O is
+    # Rust, and rustc does not care about the Visual Studio marketing version).
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Installs every workspace (incl. apps/bridge-tauri) and runs the root `prepare`, which
+      # builds the shared @tally-bridge/* packages the renderer bundle imports.
+      - name: Install
+        run: npm ci
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      # Caches the compiled dependency graph (tauri, reqwest, tokio, …) so re-runs are minutes, not
+      # the ~25 min cold compile.
+      - name: Cargo cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/bridge-tauri/src-tauri
+
+      # `tauri build` runs beforeBuildCommand (build:frontend -> esbuild bundles the real renderer),
+      # compiles the Rust, and packs the NSIS + MSI installers under src-tauri/target/release/bundle.
+      - name: Build Tauri app
+        working-directory: apps/bridge-tauri
+        run: npm run tauri build
+
+      # THE NUMBER. Print every produced installer + the raw exe, sorted by size, so the log itself
+      # answers "how big is it on Windows".
+      - name: Report installer size
+        working-directory: apps/bridge-tauri
+        shell: pwsh
+        run: |
+          Write-Host "=== Installers (NSIS + MSI) ==="
+          Get-ChildItem -Recurse src-tauri/target/release/bundle -Include *.exe,*.msi |
+            Sort-Object Length -Descending |
+            ForEach-Object { "{0,10:N0} bytes  {1}" -f $_.Length, $_.Name }
+          Write-Host "=== Raw app binary ==="
+          Get-ChildItem src-tauri/target/release -Filter *.exe |
+            ForEach-Object { "{0,10:N0} bytes  {1}" -f $_.Length, $_.Name }
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: tally-bridge-tauri-windows
+          path: |
+            apps/bridge-tauri/src-tauri/target/release/bundle/nsis/*.exe
+            apps/bridge-tauri/src-tauri/target/release/bundle/msi/*.msi
+          if-no-files-found: error

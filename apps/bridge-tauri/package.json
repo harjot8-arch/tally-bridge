@@ -1,0 +1,18 @@
+{
+  "name": "@tally-bridge/bridge-tauri",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Tally Bridge in a Tauri shell — same dashboard UI, ~10x smaller than Electron.",
+  "scripts": {
+    "build:frontend": "node build.mjs",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "esbuild": "^0.24.0"
+  }
+}
