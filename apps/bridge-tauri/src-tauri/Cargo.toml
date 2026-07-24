@@ -25,3 +25,8 @@ tokio = { version = "1", features = ["time"] }
 # WHATWG URL parsing for the open_external allowlist — same IDNA/punycode + userinfo handling the
 # TS `new URL()` gives, which is what makes the allowlist port faithful.
 url = "2"
+
+[dev-dependencies]
+# Test-only: async test runtime + a TCP fake-Tally server. `full` here does NOT bloat the release
+# binary — dev-deps are compiled only for `cargo test`.
+tokio = { version = "1", features = ["full"] }

@@ -17,6 +17,66 @@
 //! one is not.
 
 use serde::Serialize;
+use std::time::Duration;
+use tokio::sync::Mutex;
+
+/// Serializes every Tally request to ONE at a time. Tally's HTTP server is a single-threaded
+/// desktop app the owner is actively typing into; concurrent requests hang it. This is the Rust
+/// equivalent of the TS transport's single-slot queue (`packages/tally/src/transport.ts`). The
+/// whole payload is <100 KB, so there is no scenario where parallelism helps.
+struct TallyGate(Mutex<()>);
+
+#[derive(Serialize)]
+struct TallyResponse {
+    status: u16,
+    /// Raw response bytes. Decoding (UTF-16LE/BE sniff, BOM) is the audited TS codec's job in the
+    /// WebView — NOT reimplemented here, so the "works on my machine, garbage on the customer's"
+    /// encoding path has exactly one source of truth.
+    body: Vec<u8>,
+}
+
+/// The testable core: POST raw bytes to `url`, return (status, body). No Tauri, no gate — so a
+/// cargo test can exercise it directly against a fake server.
+async fn perform_tally_post(
+    url: &str,
+    body: Vec<u8>,
+    content_type: &str,
+    timeout_ms: u64,
+) -> Result<(u16, Vec<u8>), String> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_millis(timeout_ms))
+        // Do not pool: a kept-alive socket into a desktop app that may restart at any moment is a
+        // liability (mirrors the TS transport's `Connection: close`).
+        .pool_max_idle_per_host(0)
+        .build()
+        .map_err(|e| e.to_string())?;
+    let res = client
+        .post(url)
+        .header("Content-Type", content_type)
+        .header("Connection", "close")
+        .body(body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    let status = res.status().as_u16();
+    let bytes = res.bytes().await.map_err(|e| e.to_string())?;
+    Ok((status, bytes.to_vec()))
+}
+
+/// Byte-pipe to Tally on :9000. The WebView encodes the request (utf16le/utf8) with the reused TS
+/// codec, hands us the bytes, and decodes our response bytes with the same codec — Rust only moves
+/// bytes, serialized by the gate.
+#[tauri::command]
+async fn tally_request(
+    gate: tauri::State<'_, TallyGate>,
+    body: Vec<u8>,
+    content_type: String,
+    timeout_ms: u64,
+) -> Result<TallyResponse, String> {
+    let _slot = gate.0.lock().await; // single-slot: held for the whole round-trip.
+    let (status, body) = perform_tally_post("http://localhost:9000", body, &content_type, timeout_ms).await?;
+    Ok(TallyResponse { status, body })
+}
 
 /// The external-URL allowlist, ported verbatim from `apps/bridge/src/main/urls.ts`.
 ///
@@ -170,9 +230,11 @@ not_yet!(print_recovery_sheet, "Milestone 5");
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .manage(TallyGate(Mutex::new(())))
         .invoke_handler(tauri::generate_handler![
             open_external,
             detect_tally,
+            tally_request,
             is_provisioned,
             get_status,
             sync_now,
@@ -194,7 +256,9 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::safe_external_url;
+    use super::{perform_tally_post, safe_external_url};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
 
     // Mutation-checkable: each case fails if the allowlist drifts from main/urls.ts.
     #[test]
@@ -216,5 +280,51 @@ mod tests {
         assert!(safe_external_url("https://vercel.com.evil.com").is_none());
         // IDN homograph → punycode → misses the allowlist.
         assert!(safe_external_url("https://verc\u{0435}l.com").is_none());
+    }
+
+    /// Fake Tally: accept one connection, drain the request, reply with `body`.
+    async fn fake_tally_once(body: &'static [u8]) -> u16 {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            if let Ok((mut sock, _)) = listener.accept().await {
+                let mut buf = [0u8; 2048];
+                let _ = sock.read(&mut buf).await;
+                let head = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    body.len()
+                );
+                let _ = sock.write_all(head.as_bytes()).await;
+                let _ = sock.write_all(body).await;
+                let _ = sock.flush().await;
+            }
+        });
+        port
+    }
+
+    #[tokio::test]
+    async fn tally_post_returns_status_and_raw_body() {
+        let port = fake_tally_once(b"<ENVELOPE>ok</ENVELOPE>").await;
+        let url = format!("http://127.0.0.1:{port}");
+        let (status, body) = perform_tally_post(&url, b"<req/>".to_vec(), "text/xml", 2000)
+            .await
+            .expect("request should succeed");
+        assert_eq!(status, 200);
+        // Bytes are returned verbatim — decoding is the WebView codec's job, not ours.
+        assert_eq!(body, b"<ENVELOPE>ok</ENVELOPE>");
+    }
+
+    #[tokio::test]
+    async fn tally_post_times_out_on_a_silent_server() {
+        // Accept the connection but never reply — the "Tally busy in a modal" case.
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            let _held = listener.accept().await;
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        });
+        let url = format!("http://127.0.0.1:{port}");
+        let res = perform_tally_post(&url, b"<req/>".to_vec(), "text/xml", 300).await;
+        assert!(res.is_err(), "a silent server must time out, got {res:?}");
     }
 }

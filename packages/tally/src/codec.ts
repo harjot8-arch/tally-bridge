@@ -15,16 +15,23 @@ export type TallyEncoding = 'utf16le' | 'utf8';
  * say UTF-8. Tally also has an ASCII/Unicode export toggle. Hardcoding either is the single
  * most likely cause of "works on my machine, garbage on the customer's", so we detect.
  */
-export function decodeTallyResponse(buf: Buffer): string {
+// TextDecoder/TextEncoder are native in Node 22 AND the WebView, so this file is browser-clean:
+// the SAME audited codec runs in the Electron transport and in the Tauri WebView around the Rust
+// byte-pipe. Only utf-8 and utf-16le decoders are used (both available without ICU); UTF-16BE is
+// done by a manual byte-swap, exactly as the old Buffer.swap16 path did.
+const UTF8 = new TextDecoder('utf-8');
+const UTF16LE = new TextDecoder('utf-16le');
+
+export function decodeTallyResponse(buf: Uint8Array): string {
   // BOMs are unambiguous, take them first.
   if (buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xfe) {
-    return buf.subarray(2).toString('utf16le');
+    return decodeUtf16le(buf.subarray(2));
   }
   if (buf.length >= 2 && buf[0] === 0xfe && buf[1] === 0xff) {
     return decodeUtf16be(buf.subarray(2));
   }
   if (buf.length >= 3 && buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf) {
-    return buf.subarray(3).toString('utf8');
+    return UTF8.decode(buf.subarray(3));
   }
 
   // No BOM. Tally's payload is overwhelmingly ASCII-range characters, so if it is UTF-16 then
@@ -50,20 +57,42 @@ export function decodeTallyResponse(buf: Buffer): string {
   // 2-byte UTF-16LE body is still UTF-16, and decoding it as UTF-8 kept the NUL.
   if (probe.length >= 2) {
     const decisive = probe.length / 4;
-    if (zerosAtOdd > decisive) return buf.toString('utf16le');
+    if (zerosAtOdd > decisive) return decodeUtf16le(buf);
     if (zerosAtEven > decisive) return decodeUtf16be(buf);
   }
-  return buf.toString('utf8');
+  return UTF8.decode(buf);
 }
 
-/** Node has no 'utf16be'; swap to LE first. swap16 needs an even length. */
-function decodeUtf16be(body: Buffer): string {
+// Buffer.toString('utf16le') silently drops a trailing odd byte; TextDecoder would emit U+FFFD for
+// it. Truncate to even first to keep byte-identical behaviour (the codec tests pin this).
+function decodeUtf16le(body: Uint8Array): string {
   const even = body.length % 2 === 0 ? body : body.subarray(0, body.length - 1);
-  return Buffer.from(even).swap16().toString('utf16le');
+  return UTF16LE.decode(even);
 }
 
-export function encodeTallyRequest(xml: string, encoding: TallyEncoding): Buffer {
-  return encoding === 'utf16le' ? Buffer.from(xml, 'utf16le') : Buffer.from(xml, 'utf8');
+/** No dependency on an ICU 'utf-16be' decoder: swap each byte pair to LE, exactly as swap16 did. */
+function decodeUtf16be(body: Uint8Array): string {
+  const even = body.length % 2 === 0 ? body : body.subarray(0, body.length - 1);
+  const swapped = new Uint8Array(even.length);
+  for (let i = 0; i + 1 < even.length; i += 2) {
+    // Both in bounds by the loop guard; the `!` is what that guarantees, for noUncheckedIndexedAccess.
+    swapped[i] = even[i + 1]!;
+    swapped[i + 1] = even[i]!;
+  }
+  return UTF16LE.decode(swapped);
+}
+
+export function encodeTallyRequest(xml: string, encoding: TallyEncoding): Uint8Array {
+  if (encoding === 'utf8') return new TextEncoder().encode(xml);
+  // UTF-16LE: no TextEncoder for it, so write code units little-endian by hand. charCodeAt yields
+  // UTF-16 code units (surrogate pairs are two units), matching Buffer.from(xml, 'utf16le').
+  const out = new Uint8Array(xml.length * 2);
+  for (let i = 0; i < xml.length; i++) {
+    const c = xml.charCodeAt(i);
+    out[i * 2] = c & 0xff;
+    out[i * 2 + 1] = c >> 8;
+  }
+  return out;
 }
 
 /** The Content-Type Tally expects for each request encoding. */
