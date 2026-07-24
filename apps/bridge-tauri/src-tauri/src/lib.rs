@@ -16,6 +16,10 @@
 //! A stub MUST NOT return a plausible value; a blank financial figure is recoverable, an invented
 //! one is not.
 
+// Local sync state (watermarks, section hashes, quirks cache, outbox) — the M2 storage layer. The
+// sync engine wires it up in a later milestone; declared here so it compiles as part of the crate.
+mod store;
+
 use serde::Serialize;
 use std::time::Duration;
 use tokio::sync::Mutex;

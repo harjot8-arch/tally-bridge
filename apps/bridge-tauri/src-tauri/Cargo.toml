@@ -25,6 +25,9 @@ tokio = { version = "1", features = ["time"] }
 # WHATWG URL parsing for the open_external allowlist — same IDNA/punycode + userinfo handling the
 # TS `new URL()` gives, which is what makes the allowlist port faithful.
 url = "2"
+# Local sync store (M2). `bundled` compiles SQLite from source — no system libsqlite3 dependency,
+# which keeps the self-contained Windows build self-contained.
+rusqlite = { version = "0.32", features = ["bundled"] }
 
 [dev-dependencies]
 # Test-only: async test runtime + a TCP fake-Tally server. `full` here does NOT bloat the release
