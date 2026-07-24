@@ -3,12 +3,26 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "//sideEffects": "Every module here is pure declarations (functions, consts, classes) — no top-level side effects. Declaring that lets a bundler (esbuild in the Tauri WebView) tree-shake away node-only modules like transport.ts when only the browser-clean codec/requests are imported.",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./codec": {
+      "types": "./dist/codec.d.ts",
+      "default": "./dist/codec.js"
+    },
+    "./requests": {
+      "types": "./dist/requests.d.ts",
+      "default": "./dist/requests.js"
+    },
+    "./tdl": {
+      "types": "./dist/tdl.d.ts",
+      "default": "./dist/tdl.js"
     }
   },
   "scripts": {

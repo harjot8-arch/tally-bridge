@@ -6,6 +6,7 @@
 // effect BEFORE the renderer boots.
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { detectTallyViaBridge } from './tally-detect.ts';
 
 // listen() resolves to an UnlistenFn. BridgeApi wants a SYNCHRONOUS unsubscribe, so we hand back
 // a closure that awaits the pending registration and then calls it. In Milestone 1 these events
@@ -26,7 +27,9 @@ function subscribe(event: string, cb: (payload: unknown) => void): () => void {
   resetDashboard: () => invoke('reset_dashboard'),
   rebuildFromTally: () => invoke('rebuild_from_tally'),
   isProvisioned: () => invoke('is_provisioned'),
-  detectTally: () => invoke('detect_tally'),
+  // M3: real company enumeration — encode the request, POST via the Rust byte-pipe, parse with the
+  // reused codec. (Rust's detect_tally remains as a reachability-only fallback.)
+  detectTally: () => detectTallyViaBridge(invoke),
   openExternal: (url: string) => invoke('open_external', { url }),
   getMobileAccess: () => invoke('get_mobile_access'),
   getWizardState: () => invoke('get_wizard_state'),
