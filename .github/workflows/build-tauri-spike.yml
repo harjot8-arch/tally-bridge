@@ -11,6 +11,11 @@ name: Build Tauri size spike (Windows)
 
 on:
   workflow_dispatch:
+  # Also auto-run on push to the migration branch. A workflow_dispatch-only workflow's "Run
+  # workflow" button appears only once the file is on the DEFAULT branch; a push trigger runs from
+  # the feature branch directly, so the size number is available without merging to main first.
+  push:
+    branches: [tauri-migration-m1]
 
 jobs:
   build:
